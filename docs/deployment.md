@@ -1,165 +1,225 @@
 # MemoMind 部署指南
 
-## 🐳 Docker 部署（推荐）
+## 方式一：Docker（推荐）
 
 ### 快速启动
 
 ```bash
-# 1. 克隆仓库
-git clone https://github.com/your-org/memomind.git
+# 克隆仓库
+git clone https://github.com/aiwell0721/memomind.git
 cd memomind
 
-# 2. 构建并启动
-docker-compose up -d
+# 一键启动
+docker compose up -d
 
-# 3. 验证
-docker-compose exec memomind python cli.py notes list
+# 查看状态
+docker compose ps
+
+# 查看日志
+docker compose logs -f
 ```
+
+### 访问服务
+
+| 服务 | 地址 | 说明 |
+|------|------|------|
+| REST API | http://localhost:8000 | 核心 API |
+| Swagger 文档 | http://localhost:8000/docs | API 交互文档 |
+| MCP Server | http://localhost:8001 | HTTP 模式 |
 
 ### 数据持久化
 
-```yaml
-# docker-compose.yml
-volumes:
-  - ./data:/data  # 数据库文件持久化
-  - ./backups:/backups  # 备份目录
-```
-
-### 备份与恢复
+数据存储在 Docker 卷中，容器重启不会丢失：
 
 ```bash
-# 备份
-docker-compose exec memomind cp /data/memomind.db /backups/memomind-backup.db
+# 查看数据卷
+docker volume ls | grep memomind
 
-# 恢复
-docker-compose exec memomind cp /backups/memomind-backup.db /data/memomind.db
+# 备份数据
+docker run --rm -v memomind_memomind_data:/data -v $(pwd):/backup alpine tar czf /backup/memomind-backup.tar.gz /data
+
+# 恢复数据
+docker run --rm -v memomind_memomind_data:/data -v $(pwd):/backup alpine tar xzf /backup/memomind-backup.tar.gz -C /
+```
+
+### 自定义配置
+
+```bash
+# 复制环境变量模板
+cp .env.example .env
+
+# 编辑配置
+nano .env
+
+# 重启生效
+docker compose up -d
+```
+
+### 使用 Makefile
+
+```bash
+# 查看所有命令
+make help
+
+# 构建镜像
+make docker-build
+
+# 启动
+make docker-up
+
+# 停止
+make docker-down
+
+# 进入容器
+make docker-shell
 ```
 
 ---
 
-## 🖥️ 本地部署
+## 方式二：本地安装
 
 ### 环境要求
 
-- Python 3.9+
-- SQLite 3.35+
-- 内存：≥ 100MB
+- Python 3.10+
+- pip
 
 ### 安装步骤
 
 ```bash
-# 1. 克隆仓库
-git clone https://github.com/your-org/memomind.git
+# 克隆仓库
+git clone https://github.com/aiwell0721/memomind.git
 cd memomind
 
-# 2. 安装依赖
+# 安装依赖
 pip install -r requirements.txt
-pip install jieba
 
-# 3. 验证安装
-python cli.py --help
-```
+# 启动 REST API
+python -c "from core.api_server import create_app; import uvicorn; uvicorn.run(create_app('memomind.db'), host='0.0.0.0', port=8000)"
 
-### 配置
-
-```python
-# config.py
-DB_PATH = "~/memomind.db"
-LOG_LEVEL = "INFO"
-MAX_NOTE_SIZE = 1024 * 1024  # 1MB
+# 或启动 MCP Server
+python -m mcp_server --db memomind.db
 ```
 
 ---
 
-## 📦 数据迁移
+## 方式三：生产部署
 
-### 从旧版本迁移
+### 使用 Caddy 反向代理（HTTPS）
 
 ```bash
-# 导出旧数据
-python cli.py export json ./backup.json
+# 安装 Caddy
+apt install -y caddy
 
-# 导入到新实例
-python cli.py import json ./backup.json
+# 配置 /etc/caddy/Caddyfile
+memomind.example.com {
+    reverse_proxy localhost:8000
+}
+
+# 重启 Caddy
+systemctl restart caddy
 ```
 
-### 从 Markdown 导入
+### 使用 Nginx 反向代理
+
+```nginx
+server {
+    listen 80;
+    server_name memomind.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+### 系统服务（systemd）
+
+```ini
+# /etc/systemd/system/memomind.service
+[Unit]
+Description=MemoMind Knowledge Base
+After=network.target
+
+[Service]
+Type=simple
+User=memomind
+WorkingDirectory=/opt/memomind
+ExecStart=/opt/memomind/venv/bin/python -m mcp_server --db /opt/memomind/data/memomind.db --transport http --port 8001
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
 
 ```bash
-# 批量导入 Markdown 文件
-python cli.py import markdown ./notes-directory --conflict skip
+# 启用服务
+systemctl enable memomind
+systemctl start memomind
+systemctl status memomind
 ```
 
 ---
 
-## 🔧 性能优化
+## 故障排查
 
-### 数据库优化
-
-```sql
--- 启用 WAL 模式（已默认启用）
-PRAGMA journal_mode = WAL;
-
--- 启用外键
-PRAGMA foreign_keys = ON;
-
--- 优化查询
-ANALYZE;
-```
-
-### 索引优化
-
-```sql
--- 已自动创建索引
-CREATE INDEX idx_notes_tags ON notes(tags);
-CREATE INDEX idx_versions_note ON note_versions(note_id);
-CREATE INDEX idx_links_target ON note_links(target_note_id);
-```
-
----
-
-## 📊 监控与日志
-
-### 日志配置
-
-```python
-import logging
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('memomind.log'),
-        logging.StreamHandler()
-    ]
-)
-```
-
-### 性能监控
+### 容器无法启动
 
 ```bash
-# 运行基准测试
-python benchmarks/simple_benchmark.py --notes 1000
+# 查看日志
+docker compose logs memomind
+
+# 检查健康状态
+docker compose ps
+
+# 重新构建
+docker compose build --no-cache
+docker compose up -d
+```
+
+### 数据库连接失败
+
+```bash
+# 检查数据卷权限
+docker compose exec memomind ls -la /data/memomind/
+
+# 重新初始化
+docker compose down -v
+docker compose up -d
+```
+
+### API 无响应
+
+```bash
+# 检查健康端点
+curl http://localhost:8000/health
+
+# 检查端口占用
+lsof -i :8000
 ```
 
 ---
 
-## ❓ 故障排查
+## 监控
 
-### 常见问题
+### Docker 内置监控
 
-**Q: 数据库锁定错误**
+```bash
+# 查看资源使用
+docker stats memomind
+
+# 查看日志
+docker compose logs -f --tail=100
 ```
-sqlite3.OperationalError: database is locked
+
+### 健康检查
+
+```bash
+# 手动检查
+curl -f http://localhost:8000/health
+
+# 预期响应
+# {"status": "ok", "database": "connected"}
 ```
-A: 确保只有一个进程访问数据库。使用 WAL 模式可缓解。
-
-**Q: 中文搜索无结果**
-A: 确保已安装 jieba：`pip install jieba`
-
-**Q: 内存占用过高**
-A: 检查笔记数量。1000 条笔记约 45MB 内存。
-
----
-
-*需要帮助？提交 Issue 或查看 [故障排查指南](troubleshooting.md)*

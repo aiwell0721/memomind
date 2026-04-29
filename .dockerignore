@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+*.db
+
+# Git
+.git/
+.gitignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local config
+.env
+*.local
+
+# Backups
+backups/
+
+# Docs (keep in image, exclude from build context)
+docs/*.pdf
+
+# Benchmarks
+benchmarks/*.db
+
+# Temp files
+*.tmp
+*.bak
