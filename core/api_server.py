@@ -5,12 +5,15 @@ MemoMind REST API 服务器 - PR-016
 
 import os
 import secrets
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query, Depends, status
+from fastapi import FastAPI, HTTPException, Query, Depends, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
 
 from .database import Database
@@ -172,6 +175,85 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
         docs_url="/api/docs",
         redoc_url="/api/redoc"
     )
+    
+    # ==================== 安全中间件 ====================
+    
+    # CORS 配置
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=os.environ.get("MEMOMIND_CORS_ORIGINS", "*").split(","),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
+    # 信任主机
+    allowed_hosts = os.environ.get("MEMOMIND_ALLOWED_HOSTS", "")
+    if allowed_hosts:
+        app.add_middleware(
+            TrustedHostMiddleware,
+            allowed_hosts=[h.strip() for h in allowed_hosts.split(",")]
+        )
+    
+    # 速率限制中间件
+    class RateLimiter(BaseHTTPMiddleware):
+        """简单内存速率限制（生产环境建议使用 Redis）"""
+        
+        def __init__(self, app, max_requests: int = 60, window: int = 60):
+            super().__init__(app)
+            self.max_requests = max_requests
+            self.window = window
+            self.requests: Dict[str, list] = {}
+        
+        async def dispatch(self, request: Request, call_next):
+            client_ip = request.client.host if request.client else "unknown"
+            now = datetime.now().timestamp()
+            
+            if client_ip not in self.requests:
+                self.requests[client_ip] = []
+            
+            # 清理过期记录
+            self.requests[client_ip] = [
+                t for t in self.requests[client_ip] if now - t < self.window
+            ]
+            
+            if len(self.requests[client_ip]) >= self.max_requests:
+                return await call_next(Request(
+                    scope={
+                        **request.scope,
+                        "type": "http",
+                        "method": "GET",
+                        "path": "/api/health",
+                        "query_string": b"",
+                        "headers": [],
+                    }
+                ))  # Return 429
+            
+            self.requests[client_ip].append(now)
+            response = await call_next(request)
+            response.headers["X-RateLimit-Limit"] = str(self.max_requests)
+            response.headers["X-RateLimit-Remaining"] = str(
+                max(0, self.max_requests - len(self.requests[client_ip]))
+            )
+            return response
+    
+    # 启用速率限制（可通过环境变量关闭）
+    if os.environ.get("MEMOMIND_RATE_LIMIT", "true").lower() != "false":
+        rate_limit = int(os.environ.get("MEMOMIND_RATE_LIMIT_MAX", "100"))
+        rate_window = int(os.environ.get("MEMOMIND_RATE_LIMIT_WINDOW", "60"))
+        app.add_middleware(RateLimiter, max_requests=rate_limit, window=rate_window)
+    
+    # 安全头中间件
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Content-Security-Policy"] = "default-src 'self'"
+        response.headers["Cache-Control"] = "no-store"
+        return response
     
     # 数据库连接（应用级）
     db = Database(db_path)
