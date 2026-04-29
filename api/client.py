@@ -14,6 +14,10 @@ from ..core.link_service import LinkService
 from ..core.export_service import ExportService
 from ..core.import_service import ImportService
 from ..core.workspace_service import WorkspaceService
+from ..core.user_service import UserService
+from ..core.rag_service import RAGService
+from ..core.summarization_service import SummarizationService
+from ..core.activity_service import ActivityService
 
 
 class NotesAPI:
@@ -101,6 +105,10 @@ class NotesAPI:
     def restore_version(self, version_id: int) -> Optional[Dict]:
         """恢复版本"""
         return self.versions.restore_version(version_id)
+    
+    def suggest(self, prefix: str, limit: int = 10) -> List[str]:
+        """搜索建议"""
+        return self._search.suggest(prefix, limit=limit)
 
 
 class WorkspacesAPI:
@@ -176,6 +184,14 @@ class TagsAPI:
         """标签建议"""
         tags = self.tags.suggest_tags(prefix, limit)
         return [t.__dict__ for t in tags]
+    
+    def add(self, note_id: int, tag_name: str) -> int:
+        """添加标签到笔记"""
+        return self.tags.add_tag_to_note(note_id, tag_name)
+    
+    def remove(self, note_id: int, tag_name: str) -> bool:
+        """从笔记移除标签"""
+        return self.tags.remove_tag_from_note(note_id, tag_name)
 
 
 class LinksAPI:
@@ -252,6 +268,44 @@ class VersionsAPI:
         return self.versions.cleanup_versions(note_id, keep_count)
 
 
+class RAGAPI:
+    """RAG 问答 API"""
+    
+    def __init__(self, rag: RAGService):
+        self.rag = rag
+    
+    def ask(self, question: str, top_k: int = 3) -> Dict:
+        """提问并获取答案"""
+        answer = self.rag.ask(question, max_sources=top_k)
+        return answer.to_dict()
+    
+    def suggested_questions(self, note_id: int, limit: int = 5) -> List[str]:
+        """获取建议问题"""
+        return self.rag.get_suggested_questions(note_id, limit=limit)
+
+
+class SummarizerAPI:
+    """摘要 API"""
+    
+    def __init__(self, summarizer: SummarizationService):
+        self.summarizer = summarizer
+    
+    def summarize(self, note_id: int, max_length: int = 200) -> Optional[str]:
+        """生成笔记摘要"""
+        return self.summarizer.summarize(note_id, max_length=max_length)
+
+
+class ActivityAPI:
+    """活动日志 API"""
+    
+    def __init__(self, activity: ActivityService):
+        self.activity = activity
+    
+    def get_timeline(self, limit: int = 20, action: str = None) -> List:
+        """获取活动时间线"""
+        return self.activity.get_timeline(limit=limit, action=action)
+
+
 class MemoMind:
     """
     MemoMind 主 API 类
@@ -295,6 +349,10 @@ class MemoMind:
         export = ExportService(self.db)
         importer = ImportService(self.db)
         workspaces = WorkspaceService(self.db)
+        users = UserService(self.db)
+        rag = RAGService(self.db)
+        summarizer = SummarizationService(self.db)
+        activity = ActivityService(self.db)
         
         # 初始化 API
         self.notes = NotesAPI(self.db, search, versions)
@@ -304,6 +362,10 @@ class MemoMind:
         self.export = export
         self.importer = importer
         self.workspaces = WorkspacesAPI(workspaces)
+        self.rag = RAGAPI(rag)
+        self.summarizer = SummarizerAPI(summarizer)
+        self.activity = ActivityAPI(activity)
+        self._search = search  # For suggest method
     
     def close(self):
         """关闭数据库连接"""
