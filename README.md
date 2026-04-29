@@ -32,6 +32,7 @@
 
 ### 开发支持
 - 🌐 **REST API** — FastAPI 服务器、40+ 端点、JWT 认证、Swagger 文档
+- 🔌 **MCP Server** — Model Context Protocol 服务器，供 AI Agent 调用
 - 🐍 **Python SDK** — 完整的 API 客户端封装
 - 💻 **CLI 工具** — 命令行笔记管理、搜索、问答
 
@@ -98,6 +99,27 @@ python -c "from core.api_server import create_app; import uvicorn; uvicorn.run(c
 # 访问 Swagger 文档
 # http://localhost:8000/docs
 ```
+
+### 启动 MCP Server
+
+```bash
+# stdio 模式（用于 Claude Desktop、OpenClaw 等）
+python -m mcp_server --db memomind.db
+
+# HTTP 模式（用于网络访问）
+python -m mcp_server --db memomind.db --transport http --port 8001
+```
+
+**MCP 工具列表（20 个）：**
+- 笔记：create_note, get_note, update_note, delete_note, list_notes
+- 搜索：search_notes, suggest_search
+- 标签：list_tags, create_tag, add_tag_to_note
+- 链接：get_links, get_orphaned_notes
+- RAG：ask_question, get_suggested_questions
+- 摘要：summarize_note
+- 工作区：list_workspaces, create_workspace
+- 导出：export_notes
+- 活动：get_activity
 
 ---
 
