@@ -5,7 +5,7 @@
 基于 SQLite 的知识管理引擎，支持全文搜索、语义理解、版本控制、多工作区协作与 REST API。
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
-[![Tests](https://img.shields.io/badge/Tests-370%20passed-brightgreen.svg)](https://github.com)
+[![Tests](https://img.shields.io/badge/Tests-407%20passed-brightgreen.svg)](https://github.com)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 
 ---
@@ -196,7 +196,13 @@ memomind/
 - [x] Phase 1: 基础笔记 + 分类
 - [x] Phase 2: 搜索/版本/导入导出/标签/链接/RAG
 - [x] Phase 3: 多工作区/用户/活动日志/冲突/备份/REST API
-- [ ] Phase 4: Web UI + MCP Server + 生产就绪
+- [x] Phase 4 (部分): MCP Server + Docker 部署 + 安全加固
+  - [x] PR-022: MCP Server (20 工具)
+  - [x] PR-019: Docker 部署
+  - [x] PR-021: 导出增强 (Obsidian/Notion/PDF)
+  - [x] PR-023: 安全加固
+  - [ ] PR-018: Web Dashboard
+  - [ ] PR-020: 实时协作
 
 详细规划见 [docs/phase4-plan.md](docs/phase4-plan.md)
 
