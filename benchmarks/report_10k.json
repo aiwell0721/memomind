@@ -1,0 +1,27 @@
+{
+  "note_count": 10000,
+  "data_generation_seconds": 4.11,
+  "memory_mb": 0.02,
+  "memory_peak_mb": 0.03,
+  "db_size_mb": 11.52,
+  "search": {
+    "AI": {"avg_ms": 5713.862, "min_ms": 0, "max_ms": 0, "note": "首次搜索含 jieba 初始化开销"},
+    "AI 技术": {"avg_ms": 30.164, "min_ms": 0, "max_ms": 0},
+    "Python 机器学习": {"avg_ms": 32.785, "min_ms": 0, "max_ms": 0},
+    "数据库 搜索": {"avg_ms": 27.752, "min_ms": 0, "max_ms": 0},
+    "空查询": {"avg_ms": 0.007, "min_ms": 0, "max_ms": 0}
+  },
+  "tag_list_ms": 0.853,
+  "tag_tree_ms": 0.968,
+  "outgoing_links_ms": 0.251,
+  "incoming_links_ms": 0.204,
+  "link_graph_ms": 336.056,
+  "markdown_export_ms": 13078.4,
+  "json_export_ms": 4518.9,
+  "notes": {
+    "jieba_init_overhead": "首次搜索包含 jieba 分词器初始化 (~56s)，后续搜索 27-32ms",
+    "export_slow": "10K 笔记 Markdown 导出 13s，JSON 导出 4.5s，适合离线批量操作",
+    "graph_slow": "链接图谱 336ms，数据量大时建议异步加载",
+    "db_size": "10K 笔记 11.52MB，100K 预估 ~115MB"
+  }
+}
