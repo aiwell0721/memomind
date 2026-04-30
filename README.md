@@ -5,7 +5,8 @@
 基于 SQLite 的知识管理引擎，支持全文搜索、语义理解、版本控制、多工作区协作与 REST API。
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
-[![Tests](https://img.shields.io/badge/Tests-407%20passed-brightgreen.svg)](https://github.com)
+[![Tests](https://img.shields.io/badge/Tests-427%20passed-brightgreen.svg)](https://github.com)
+[![Web](https://img.shields.io/badge/Web-React%20%2B%20Vite-blueviolet.svg)](./web)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
 
 ---
@@ -32,6 +33,7 @@
 
 ### 开发支持
 - 🌐 **REST API** — FastAPI 服务器、40+ 端点、JWT 认证、Swagger 文档
+- 🖥️ **Web Dashboard** — React + Vite + Tailwind，完整笔记管理界面
 - 🔌 **MCP Server** — Model Context Protocol 服务器，供 AI Agent 调用
 - 🐍 **Python SDK** — 完整的 API 客户端封装
 - 💻 **CLI 工具** — 命令行笔记管理、搜索、问答
@@ -100,6 +102,35 @@ python -c "from core.api_server import create_app; import uvicorn; uvicorn.run(c
 # http://localhost:8000/docs
 ```
 
+### 启动 Web Dashboard
+
+```bash
+# 进入前端目录
+cd web
+
+# 安装依赖（首次）
+npm install
+
+# 开发模式（自动代理到后端）
+npm run dev
+# 访问 http://localhost:3000
+
+# 生产构建
+npm run build
+# 构建产物在 web/dist/
+```
+
+**功能特性：**
+- 🔐 用户登录 / 认证
+- 📝 笔记列表 + 搜索 + 高亮
+- ✏️ Markdown 编辑器 + 预览
+- 🏷️ 标签树管理
+- 📜 版本历史 + 恢复
+- 🏢 工作区切换
+- 📋 活动日志时间线
+- ⚙️ 设置（工作区 / 用户 / 备份）
+- 📱 响应式设计
+
 ### 启动 MCP Server
 
 ```bash
@@ -136,7 +167,7 @@ python -m pytest tests/test_integration.py -v
 python -m pytest tests/test_performance.py -v
 ```
 
-**当前状态：** 370 个测试全部通过 ✅
+**当前状态：** 427 个测试全部通过 ✅
 
 ---
 
@@ -168,8 +199,14 @@ memomind/
 │   └── api_server.py        # REST API（FastAPI）
 ├── api/                     # Python SDK
 │   └── client.py
-├── tests/                   # 测试套件（370 个测试）
+├── tests/                   # 测试套件（427 个测试）
 ├── benchmarks/              # 性能基准测试
+├── web/                     # Web Dashboard (React + Vite)
+│   ├── src/                 # 前端源码
+│   │   ├── pages/           # 页面组件
+│   │   ├── lib/             # API 客户端
+│   │   └── App.tsx          # 应用入口
+│   └── dist/                # 构建产物
 ├── docs/                    # 文档
 ├── cli.py                   # 命令行工具
 ├── requirements.txt         # 依赖
@@ -196,13 +233,13 @@ memomind/
 - [x] Phase 1: 基础笔记 + 分类
 - [x] Phase 2: 搜索/版本/导入导出/标签/链接/RAG
 - [x] Phase 3: 多工作区/用户/活动日志/冲突/备份/REST API
-- [x] Phase 4 (部分): MCP Server + Docker 部署 + 安全加固
+- [ ] Phase 4: Web Dashboard + 实时协作 (83%)
   - [x] PR-022: MCP Server (20 工具)
   - [x] PR-019: Docker 部署
   - [x] PR-021: 导出增强 (Obsidian/Notion/PDF)
   - [x] PR-023: 安全加固
-  - [ ] PR-018: Web Dashboard
-  - [ ] PR-020: 实时协作
+  - [x] PR-018: Web Dashboard (React + Vite, 20 测试)
+  - [ ] PR-020: 实时协作 (WebSocket)
 
 详细规划见 [docs/phase4-plan.md](docs/phase4-plan.md)
 
