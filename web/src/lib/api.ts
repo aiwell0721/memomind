@@ -194,3 +194,118 @@ export interface Backup {
   size: number;
   created_at: string;
 }
+
+// ==================== WebSocket 协作 ====================
+
+export interface Collaborator {
+  user_id: number;
+  username: string;
+  joined_at: string;
+}
+
+export interface WsMessage {
+  type: 'edit' | 'user_joined' | 'user_left' | 'ping' | 'pong';
+  user_id?: number;
+  user?: Collaborator;
+  users?: Collaborator[];
+  title?: string;
+  content?: string;
+  timestamp?: string;
+}
+
+export type WsCallback = (msg: WsMessage) => void;
+
+/**
+ * WebSocket 协作客户端
+ *
+ * 用法：
+ *   const ws = createWsClient(noteId, (msg) => {
+ *     if (msg.type === 'edit') { /* 同步内容 *\/ }
+ *     if (msg.type === 'user_joined') { /* 更新在线用户 *\/ }
+ *   });
+ *   ws.sendEdit(title, content);  // 广播编辑
+ *   ws.disconnect();              // 断开连接
+ */
+export function createWsClient(
+  noteId: number,
+  onMessage: WsCallback
+) {
+  const token = localStorage.getItem('memomind_token');
+  if (!token) {
+    return {
+      sendEdit: () => {},
+      disconnect: () => {},
+      users: [] as Collaborator[],
+    };
+  }
+
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  const wsUrl = `${proto}//${host}/ws/notes/${noteId}?token=${token}`;
+
+  let ws: WebSocket | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let users: Collaborator[] = [];
+
+  function connect() {
+    try {
+      ws = new WebSocket(wsUrl);
+    } catch {
+      scheduleReconnect();
+      return;
+    }
+
+    ws.onmessage = (event) => {
+      try {
+        const msg: WsMessage = JSON.parse(event.data);
+        if (msg.type === 'user_joined' || msg.type === 'user_left') {
+          users = msg.users || [];
+        }
+        onMessage(msg);
+      } catch {
+        // 忽略解析错误
+      }
+    };
+
+    ws.onclose = () => {
+      // 非主动断开时重连
+      if (ws) scheduleReconnect();
+    };
+
+    ws.onerror = () => {
+      // 连接失败，尝试重连
+    };
+  }
+
+  function scheduleReconnect() {
+    if (reconnectTimer) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connect();
+    }, 3000);
+  }
+
+  function sendEdit(title: string, content: string) {
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'edit', title, content }));
+    }
+  }
+
+  function disconnect() {
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+    if (ws) {
+      ws.onclose = null; // 防止重连
+      ws.close();
+      ws = null;
+    }
+  }
+
+  connect();
+
+  return {
+    get users() { return users; },
+    sendEdit,
+    disconnect,
+  };
+}

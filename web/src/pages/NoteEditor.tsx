@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { marked } from 'marked';
 import { api } from '../lib/api';
-import type { Note, Version } from '../lib/api';
+import type { Note, Version, Collaborator } from '../lib/api';
+import { createWsClient } from '../lib/api';
 
 export default function NoteEditor() {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +18,11 @@ export default function NoteEditor() {
   const [versions, setVersions] = useState<Version[]>([]);
   const [showVersions, setShowVersions] = useState(false);
   const [incomingLinks, setIncomingLinks] = useState<unknown[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<Collaborator[]>([]);
+  const [remoteEdit, setRemoteEdit] = useState(false);
+
+  const wsRef = useRef<ReturnType<typeof createWsClient> | null>(null);
+  const isLocalEdit = useRef(false);
 
   const loadNote = useCallback(async () => {
     if (!id) return;
@@ -28,10 +34,7 @@ export default function NoteEditor() {
       setEditContent(data.content);
       setEditTags(data.tags.join(', '));
 
-      // Load versions
       api.versions(Number(id), 10).then(setVersions).catch(() => {});
-
-      // Load incoming links
       api.incomingLinks(Number(id)).then(setIncomingLinks).catch(() => {});
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '加载失败');
@@ -44,9 +47,37 @@ export default function NoteEditor() {
     loadNote();
   }, [loadNote]);
 
+  // WebSocket 协作连接
+  useEffect(() => {
+    if (!id || !note) return;
+
+    const ws = createWsClient(Number(id), (msg) => {
+      if (msg.type === 'edit' && msg.content !== undefined) {
+        // 收到远程编辑，同步到本地
+        if (!isLocalEdit.current) {
+          setEditContent(msg.content || '');
+          setEditTitle(msg.title || '');
+        }
+        setRemoteEdit(true);
+        setTimeout(() => setRemoteEdit(false), 2000);
+      }
+      if (msg.type === 'user_joined' || msg.type === 'user_left') {
+        setOnlineUsers(msg.users || []);
+      }
+    });
+
+    wsRef.current = ws;
+
+    return () => {
+      ws.disconnect();
+      wsRef.current = null;
+    };
+  }, [id, note?.updated_at]);
+
   const handleSave = async () => {
     if (!note || !editTitle.trim()) return;
     setLoading(true);
+    isLocalEdit.current = true;
     try {
       const tags = editTags
         .split(',')
@@ -59,12 +90,25 @@ export default function NoteEditor() {
       });
       setEditMode(false);
       loadNote();
+
+      // 广播保存结果给协作者
+      wsRef.current?.sendEdit(editTitle, editContent);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '保存失败');
     } finally {
       setLoading(false);
+      setTimeout(() => { isLocalEdit.current = false; }, 500);
     }
   };
+
+  // 编辑内容变化时广播（仅在编辑模式下）
+  useEffect(() => {
+    if (!editMode || !wsRef.current) return;
+    const timer = setTimeout(() => {
+      wsRef.current?.sendEdit(editTitle, editContent);
+    }, 500); // 防抖 500ms
+    return () => clearTimeout(timer);
+  }, [editTitle, editContent, editMode]);
 
   const handleSaveVersion = async () => {
     if (!note) return;
@@ -109,7 +153,20 @@ export default function NoteEditor() {
         <button className="btn btn-secondary btn-sm" onClick={() => navigate('/')}>
           ← 返回
         </button>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-3">
+          {/* 在线用户 */}
+          {onlineUsers.length > 0 && (
+            <div className="flex items-center gap-1" title={`${onlineUsers.length} 人正在编辑`}>
+              {onlineUsers.map((u) => (
+                <span
+                  key={u.user_id}
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-100 text-blue-600 text-xs font-medium"
+                >
+                  {u.username.charAt(0).toUpperCase()}
+                </span>
+              ))}
+            </div>
+          )}
           <button className="btn btn-secondary btn-sm" onClick={() => setShowVersions(!showVersions)}>
             📜 版本历史 ({versions.length})
           </button>
@@ -129,6 +186,13 @@ export default function NoteEditor() {
           )}
         </div>
       </div>
+
+      {/* 远程编辑通知 */}
+      {remoteEdit && (
+        <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg text-blue-600 text-sm">
+          协作者已更新内容
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">

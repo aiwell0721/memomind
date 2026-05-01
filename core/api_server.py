@@ -9,7 +9,7 @@ from typing import List, Optional, Dict
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query, Depends, status, Request
+from fastapi import FastAPI, HTTPException, Query, Depends, status, Request, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -28,6 +28,7 @@ from .user_service import UserService
 from .activity_service import ActivityService
 from .conflict_service import ConflictService
 from .backup_service import BackupService
+from .collaboration_service import CollaborationService
 
 
 # ==================== Pydantic 模型 ====================
@@ -270,6 +271,7 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
     activity = ActivityService(db)
     conflict = ConflictService(db)
     backup = BackupService(db)
+    collaboration = CollaborationService(db)
     
     # ==================== 笔记 API ====================
     
@@ -789,5 +791,61 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
             'version': '3.0.0',
             'db_path': db_path
         }
+
+    # ==================== WebSocket 实时协作 ====================
+
+    def verify_ws_token(token: str) -> Optional[dict]:
+        """验证 WebSocket Token（复用 HTTP 认证逻辑）"""
+        try:
+            import binascii
+            decoded = bytes.fromhex(token).decode('utf-8')
+            username, expire_str = decoded.rsplit(':', 1)
+            expire_ts = int(expire_str)
+
+            if datetime.now().timestamp() > expire_ts:
+                return None
+
+            return {"username": username}
+        except (ValueError, binascii.Error):
+            return None
+
+    @app.websocket("/ws/notes/{note_id}")
+    async def websocket_endpoint(websocket: WebSocket, note_id: int, token: str):
+        """
+        笔记实时协作 WebSocket 端点
+
+        连接方式：ws://host/ws/notes/{note_id}?token={hex_token}
+
+        消息格式：
+        - 客户端发送编辑变更：{"type": "edit", "title": "...", "content": "..."}
+        - 客户端心跳：{"type": "ping"}
+        - 服务器心跳：{"type": "ping"}
+        - 服务器广播编辑：{"type": "edit", "user_id": N, "title": "...", "content": "...", "timestamp": "..."}
+        - 用户加入/离开：{"type": "user_joined"/"user_left", "user": {...}, "users": [...]}
+        """
+        # 验证 Token
+        user = verify_ws_token(token)
+        if not user:
+            await websocket.close(code=4001, reason="无效或过期 Token")
+            return
+
+        # 获取用户 ID
+        cursor = db.execute("SELECT id FROM users WHERE username = ?", (user['username'],))
+        row = cursor.fetchone()
+        if not row:
+            await websocket.close(code=4002, reason="用户不存在")
+            return
+
+        user_id = row['id']
+        username = user['username']
+
+        # 检查笔记是否存在
+        cursor = db.execute("SELECT id FROM notes WHERE id = ?", (note_id,))
+        if not cursor.fetchone():
+            await websocket.close(code=4003, reason="笔记不存在")
+            return
+
+        await websocket.accept()
+        await collaboration.handle_connection(websocket, note_id, user_id, username)
     
     return app
