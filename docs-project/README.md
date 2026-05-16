@@ -1,6 +1,6 @@
 # MemoMind 项目文档索引
 
-> **文档分层分类体系**：3 层 6 类
+> **文档分类体系**：扁平 6 类
 
 ---
 
@@ -8,12 +8,12 @@
 
 ```
 docs-project/
-├── 01-product-concept/       # 第一层 · 第1类：产品概念及商业逻辑
-├── 02-business-logic/        # 第一层 · 第2类：产品业务逻辑
-├── 03-architecture/          # 第二层 · 第3类：产品架构设计
-├── 04-detailed-design/       # 第二层 · 第4类：产品详细设计
-├── 05-development-plan/      # 第三层 · 第5类：产品开发计划
-└── 06-test-docs/             # 第三层 · 第6类：测试文档
+├── 01-product-concept/       # 第1类：产品概念及商业逻辑
+├── 02-business-logic/        # 第2类：产品业务逻辑
+├── 03-architecture/          # 第3类：产品架构设计
+├── 04-detailed-design/       # 第4类：产品详细设计
+├── 05-development-plan/      # 第5类：产品开发计划
+└── 06-test-docs/             # 第6类：测试文档
 ```
 
 ---
@@ -74,9 +74,7 @@ docs-project/
 
 ---
 
-## 第三层：开发计划与测试
-
-### 第5类：产品开发计划 (`05-development-plan/`)
+## 第5类：产品开发计划 (`05-development-plan/`)
 
 | # | 文档 | 说明 |
 |---|------|------|
