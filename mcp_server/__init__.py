@@ -325,7 +325,9 @@ def main():
         print(f"Starting MemoMind MCP Server on http://{args.host}:{args.port}")
         print(f"Database: {args.db}")
         print(f"Docs: http://{args.host}:{args.port}/docs")
-        mcp.run(transport="http", host=args.host, port=args.port)
+        import uvicorn
+        app = mcp.streamable_http_app()
+        uvicorn.run(app, host=args.host, port=args.port)
     else:
         print(f"Starting MemoMind MCP Server (stdio mode)", file=sys.stderr)
         print(f"Database: {args.db}", file=sys.stderr)

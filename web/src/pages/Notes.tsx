@@ -99,127 +99,236 @@ export default function Notes() {
 
   const displayNotes = searchResults ? searchResults.map((r) => r.note) : notes;
 
+  // Format date relative
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    const diffHr = Math.floor(diffMs / 3600000);
+    const diffDay = Math.floor(diffMs / 86400000);
+
+    if (diffMin < 1) return '刚刚';
+    if (diffMin < 60) return `${diffMin} 分钟前`;
+    if (diffHr < 24) return `${diffHr} 小时前`;
+    if (diffDay < 7) return `${diffDay} 天前`;
+    return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
+  };
+
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="fade-in" style={{ padding: '2rem', maxWidth: 800, margin: '0 auto' }}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between" style={{ marginBottom: '1.5rem' }}>
         <div>
-          <h1 className="text-2xl font-bold">📝 笔记</h1>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.021em' }}>
+            笔记
+          </h1>
           {selectedTag && (
-            <span className="text-sm text-gray-500">
-              标签: <span className="tag">{selectedTag}</span>
+            <div style={{ fontSize: 13, color: 'var(--apple-text-secondary)', marginTop: 4 }}>
+              标签：<span className="tag">{selectedTag}</span>
               <button
-                className="ml-2 text-red-500 hover:text-red-600"
                 onClick={() => navigate('/')}
+                style={{
+                  marginLeft: 8,
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--danger)',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  fontFamily: 'inherit',
+                }}
               >
                 清除
               </button>
-            </span>
+            </div>
           )}
         </div>
         <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-          + 新建笔记
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          新建笔记
         </button>
       </div>
 
       {/* Search */}
-      <div className="flex gap-2 mb-4">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          className="input flex-1"
-          placeholder="搜索笔记..."
-        />
+      <div className="flex gap-2" style={{ marginBottom: '1.25rem' }}>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <svg
+            width="16" height="16"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+            style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', opacity: 0.35, pointerEvents: 'none' }}
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            className="input"
+            placeholder="搜索笔记..."
+            style={{ paddingLeft: 36 }}
+          />
+        </div>
         <button className="btn btn-secondary" onClick={() => handleSearch()}>
-          🔍 搜索
+          搜索
         </button>
         {searchResults && (
-          <button className="btn btn-secondary" onClick={() => { setQuery(''); setSearchResults(null); }}>
+          <button
+            className="btn btn-ghost"
+            onClick={() => { setQuery(''); setSearchResults(null); }}
+          >
             显示全部
           </button>
         )}
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+        <div style={{
+          marginBottom: '1rem',
+          padding: '0.75rem 1rem',
+          background: 'var(--danger-bg)',
+          borderRadius: 10,
+          color: 'var(--danger)',
+          fontSize: 13,
+        }}>
           {error}
         </div>
       )}
 
       {/* Create dialog */}
       {showCreate && (
-        <div className="mb-4 card">
-          <h3 className="font-medium mb-3">新建笔记</h3>
+        <div className="card slide-in" style={{ marginBottom: '1.25rem' }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>新建笔记</h3>
           <input
             type="text"
             value={newNote.title}
             onChange={(e) => setNewNote({ ...newNote, title: e.target.value })}
-            className="input mb-2"
+            className="input"
             placeholder="标题"
             autoFocus
+            style={{ marginBottom: 10 }}
           />
           <textarea
             value={newNote.content}
             onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
-            className="input mb-3"
+            className="input"
             placeholder="内容（支持 Markdown）"
             rows={4}
+            style={{ marginBottom: 12 }}
           />
           <div className="flex gap-2">
-            <button className="btn btn-primary btn-sm" onClick={handleCreate}>
-              创建
-            </button>
-            <button className="btn btn-secondary btn-sm" onClick={() => setShowCreate(false)}>
-              取消
-            </button>
+            <button className="btn btn-primary btn-sm" onClick={handleCreate}>创建</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowCreate(false)}>取消</button>
           </div>
         </div>
       )}
 
       {/* Notes list */}
       {loading ? (
-        <div className="text-center py-12 text-gray-400">加载中...</div>
+        <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--apple-text-tertiary)', fontSize: 14 }}>
+          加载中...
+        </div>
       ) : displayNotes.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">
-          {query ? '没有找到匹配的笔记' : '暂无笔记，点击上方按钮创建'}
+        <div style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--apple-text-tertiary)' }}>
+          <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.4 }}>📝</div>
+          <div style={{ fontSize: 14 }}>
+            {query ? '没有找到匹配的笔记' : '暂无笔记，点击上方按钮创建'}
+          </div>
         </div>
       ) : (
         <div className="space-y-2">
           {displayNotes.map((note) => (
             <div
               key={note.id}
-              className="card hover:shadow-md transition cursor-pointer flex items-center justify-between"
+              className="card card-hover"
+              style={{
+                cursor: 'pointer',
+                padding: '1rem 1.25rem',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 16,
+                marginBottom: 8,
+                animation: 'fadeIn 0.2s ease-out',
+              }}
               onClick={() => navigate(`/notes/${note.id}`)}
             >
-              <div className="flex-1 min-w-0">
-                <h3 className="font-medium truncate">{note.title}</h3>
-                <p className="text-sm text-gray-500 truncate">{note.content.slice(0, 100)}</p>
-                <div className="flex items-center gap-2 mt-1">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h3 style={{
+                  fontWeight: 600,
+                  fontSize: 14,
+                  marginBottom: 4,
+                  letterSpacing: '-0.01em',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {note.title}
+                </h3>
+                <p style={{
+                  fontSize: 13,
+                  color: 'var(--apple-text-secondary)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  marginBottom: 8,
+                }}>
+                  {note.content.slice(0, 120)}
+                </p>
+                <div className="flex items-center gap-2">
                   {note.tags.slice(0, 3).map((tag, i) => (
-                    <span key={i} className="tag">
-                      {tag}
-                    </span>
+                    <span key={i} className="tag">{tag}</span>
                   ))}
-                  <span className="text-xs text-gray-400">
-                    {new Date(note.updated_at).toLocaleDateString()}
-                  </span>
                 </div>
               </div>
-              <button
-                className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition"
-                onClick={(e) => handleDelete(note.id, e)}
-              >
-                🗑️
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                <span style={{ fontSize: 11, color: 'var(--apple-text-tertiary)', whiteSpace: 'nowrap' }}>
+                  {formatDate(note.updated_at)}
+                </span>
+                <button
+                  onClick={(e) => handleDelete(note.id, e)}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 6,
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    color: 'var(--apple-text-tertiary)',
+                    transition: 'all 0.15s',
+                    opacity: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = '1';
+                    e.currentTarget.style.background = 'var(--danger-bg)';
+                    e.currentTarget.style.color = 'var(--danger)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = '0';
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = 'var(--apple-text-tertiary)';
+                  }}
+                  title="删除"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                </button>
+              </div>
             </div>
           ))}
         </div>
       )}
 
       {searchResults && (
-        <div className="mt-2 text-sm text-gray-500">
+        <div style={{ marginTop: 8, fontSize: 12, color: 'var(--apple-text-tertiary)' }}>
           找到 {searchResults.length} 条结果
         </div>
       )}

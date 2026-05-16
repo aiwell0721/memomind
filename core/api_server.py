@@ -5,9 +5,13 @@ MemoMind REST API 服务器 - PR-016
 
 import os
 import secrets
+import time
 from typing import List, Optional, Dict
 from datetime import datetime, timedelta
 from pathlib import Path
+
+# Server start time for uptime tracking
+_SERVER_START = time.time()
 
 from fastapi import FastAPI, HTTPException, Query, Depends, status, Request, WebSocket, WebSocketDisconnect
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -786,11 +790,66 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
     @app.get("/api/health", summary="健康检查")
     def health_check():
         """健康检查端点（无需认证）"""
+        # Database connectivity check
+        db_status = "ok"
+        db_stats = {}
+        try:
+            # Basic DB query
+            cursor = db.execute("SELECT COUNT(*) as count FROM notes")
+            row = cursor.fetchone()
+            note_count = row['count'] if row else 0
+            
+            cursor = db.execute("SELECT COUNT(*) as count FROM users")
+            row = cursor.fetchone()
+            user_count = row['count'] if row else 0
+            
+            cursor = db.execute("SELECT COUNT(*) as count FROM workspaces")
+            row = cursor.fetchone()
+            workspace_count = row['count'] if row else 1
+            
+            cursor = db.execute("SELECT COUNT(*) as count FROM tags")
+            row = cursor.fetchone()
+            tag_count = row['count'] if row else 0
+            
+            db_stats = {
+                'note_count': note_count,
+                'user_count': user_count,
+                'workspace_count': workspace_count,
+                'tag_count': tag_count,
+                'db_path': db_path,
+                'db_size_mb': round(os.path.getsize(db_path) / (1024*1024), 2) if os.path.exists(db_path) else 0
+            }
+        except Exception as e:
+            db_status = f"error: {str(e)}"
+        
+        uptime = time.time() - _SERVER_START
+        
         return {
-            'status': 'healthy',
+            'status': 'healthy' if db_status == 'ok' else 'degraded',
             'version': '3.0.0',
-            'db_path': db_path
+            'uptime_seconds': round(uptime, 1),
+            'uptime_human': _format_uptime(uptime),
+            'database': {
+                'status': db_status,
+                **db_stats
+            },
+            'features': {
+                'websocket': True,
+                'rate_limit': os.environ.get("MEMOMIND_RATE_LIMIT", "true").lower() != "false"
+            }
         }
+    
+    def _format_uptime(seconds):
+        """Format uptime in human readable format"""
+        days = int(seconds // 86400)
+        hours = int((seconds % 86400) // 3600)
+        minutes = int((seconds % 3600) // 60)
+        if days > 0:
+            return f"{days}d {hours}h {minutes}m"
+        elif hours > 0:
+            return f"{hours}h {minutes}m"
+        else:
+            return f"{minutes}m"
 
     # ==================== WebSocket 实时协作 ====================
 

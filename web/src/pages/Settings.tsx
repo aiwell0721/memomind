@@ -2,6 +2,30 @@ import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import type { Workspace, User, Backup } from '../lib/api';
 
+const tabIcons: Record<string, React.ReactNode> = {
+  workspaces: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+    </svg>
+  ),
+  users: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
+  backups: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <ellipse cx="12" cy="5" rx="9" ry="3" />
+      <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+      <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+    </svg>
+  ),
+};
+
 export default function Settings() {
   const [activeTab, setActiveTab] = useState<'workspaces' | 'users' | 'backups'>('workspaces');
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -10,11 +34,8 @@ export default function Settings() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Workspace state
   const [newWorkspaceName, setNewWorkspaceName] = useState('');
   const [newWorkspaceDesc, setNewWorkspaceDesc] = useState('');
-
-  // User state
   const [newUsername, setNewUsername] = useState('');
 
   useEffect(() => {
@@ -99,33 +120,127 @@ export default function Settings() {
   };
 
   const tabs = [
-    { id: 'workspaces' as const, label: '🏢 工作区' },
-    { id: 'users' as const, label: '👥 用户' },
-    { id: 'backups' as const, label: '💾 备份' },
+    { id: 'workspaces' as const, label: '工作区' },
+    { id: 'users' as const, label: '用户' },
+    { id: 'backups' as const, label: '备份' },
   ];
 
+  // Reusable row with delete button
+  const ListItem = ({
+    primary,
+    secondary,
+    onRemove,
+  }: {
+    primary: string;
+    secondary?: string;
+    onRemove: () => void;
+  }) => (
+    <div
+      className="flex items-center justify-between"
+      style={{
+        padding: '0.625rem 0.875rem',
+        background: 'var(--apple-bg)',
+        borderRadius: 8,
+        marginBottom: 6,
+        transition: 'background 0.15s',
+      }}
+    >
+      <div>
+        <span style={{ fontSize: 13, fontWeight: 500 }}>{primary}</span>
+        {secondary && (
+          <span style={{ fontSize: 12, color: 'var(--apple-text-secondary)', marginLeft: 8 }}>
+            {secondary}
+          </span>
+        )}
+      </div>
+      <button
+        onClick={onRemove}
+        style={{
+          width: 24,
+          height: 24,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 6,
+          border: 'none',
+          background: 'transparent',
+          cursor: 'pointer',
+          color: 'var(--apple-text-tertiary)',
+          transition: 'all 0.15s',
+          opacity: 0.4,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.opacity = '1';
+          e.currentTarget.style.background = 'var(--danger-bg)';
+          e.currentTarget.style.color = 'var(--danger)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.opacity = '0.4';
+          e.currentTarget.style.background = 'transparent';
+          e.currentTarget.style.color = 'var(--apple-text-tertiary)';
+        }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+        </svg>
+      </button>
+    </div>
+  );
+
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">⚙️ 设置</h1>
+    <div className="fade-in" style={{ padding: '2rem', maxWidth: 600, margin: '0 auto' }}>
+      <h1 style={{ fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.021em', marginBottom: '1.5rem' }}>
+        设置
+      </h1>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+        <div style={{
+          marginBottom: '1rem',
+          padding: '0.75rem 1rem',
+          background: 'var(--danger-bg)',
+          borderRadius: 10,
+          color: 'var(--danger)',
+          fontSize: 13,
+        }}>
           {error}
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-2 mb-6 border-b border-gray-200">
+      {/* Tabs — Apple segmented control style */}
+      <div
+        style={{
+          display: 'flex',
+          background: 'rgba(0,0,0,0.04)',
+          borderRadius: 10,
+          padding: 2,
+          marginBottom: '1.5rem',
+        }}
+      >
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => { setActiveTab(tab.id); setError(''); }}
-            className={`px-4 py-2 border-b-2 transition ${
-              activeTab === tab.id
-                ? 'border-blue-500 text-blue-600 font-medium'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              padding: '0.5rem 0.75rem',
+              fontSize: 13,
+              fontWeight: 500,
+              fontFamily: 'inherit',
+              border: 'none',
+              borderRadius: 8,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              background: activeTab === tab.id ? 'var(--apple-surface)' : 'transparent',
+              color: activeTab === tab.id ? 'var(--apple-text)' : 'var(--apple-text-secondary)',
+              boxShadow: activeTab === tab.id ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+            }}
           >
+            {tabIcons[tab.id]}
             {tab.label}
           </button>
         ))}
@@ -133,10 +248,10 @@ export default function Settings() {
 
       {/* Workspaces */}
       {activeTab === 'workspaces' && (
-        <div className="space-y-4">
-          <div className="card">
-            <h3 className="font-medium mb-3">新建工作区</h3>
-            <div className="flex gap-2">
+        <div>
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>新建工作区</h3>
+            <div className="flex gap-2" style={{ marginBottom: 8 }}>
               <input
                 type="text"
                 value={newWorkspaceName}
@@ -151,40 +266,33 @@ export default function Settings() {
                 className="input"
                 placeholder="描述（可选）"
               />
-              <button
-                className="btn btn-primary"
-                onClick={handleCreateWorkspace}
-                disabled={loading}
-              >
-                创建
-              </button>
             </div>
+            <button
+              className="btn btn-primary"
+              onClick={handleCreateWorkspace}
+              disabled={loading}
+            >
+              创建
+            </button>
           </div>
 
           <div className="card">
-            <h3 className="font-medium mb-3">工作区列表 ({workspaces.length})</h3>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
+              工作区列表 ({workspaces.length})
+            </h3>
             {workspaces.length === 0 ? (
-              <p className="text-gray-400 text-center py-4">暂无工作区</p>
+              <p style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--apple-text-tertiary)', fontSize: 13 }}>
+                暂无工作区
+              </p>
             ) : (
-              <div className="space-y-2">
+              <div>
                 {workspaces.map((ws) => (
-                  <div
+                  <ListItem
                     key={ws.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded"
-                  >
-                    <div>
-                      <span className="font-medium">{ws.name}</span>
-                      {ws.description && (
-                        <span className="text-sm text-gray-400 ml-2">{ws.description}</span>
-                      )}
-                    </div>
-                    <button
-                      className="p-1 text-red-400 hover:text-red-600 transition"
-                      onClick={() => handleDeleteWorkspace(ws.id)}
-                    >
-                      🗑️
-                    </button>
-                  </div>
+                    primary={ws.name}
+                    secondary={ws.description}
+                    onRemove={() => handleDeleteWorkspace(ws.id)}
+                  />
                 ))}
               </div>
             )}
@@ -194,9 +302,9 @@ export default function Settings() {
 
       {/* Users */}
       {activeTab === 'users' && (
-        <div className="space-y-4">
-          <div className="card">
-            <h3 className="font-medium mb-3">新建用户</h3>
+        <div>
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>新建用户</h3>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -216,29 +324,22 @@ export default function Settings() {
           </div>
 
           <div className="card">
-            <h3 className="font-medium mb-3">用户列表 ({users.length})</h3>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
+              用户列表 ({users.length})
+            </h3>
             {users.length === 0 ? (
-              <p className="text-gray-400 text-center py-4">暂无用户</p>
+              <p style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--apple-text-tertiary)', fontSize: 13 }}>
+                暂无用户
+              </p>
             ) : (
-              <div className="space-y-2">
+              <div>
                 {users.map((user) => (
-                  <div
+                  <ListItem
                     key={user.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded"
-                  >
-                    <div>
-                      <span className="font-medium">{user.username}</span>
-                      {user.display_name && (
-                        <span className="text-sm text-gray-400 ml-2">{user.display_name}</span>
-                      )}
-                    </div>
-                    <button
-                      className="p-1 text-red-400 hover:text-red-600 transition"
-                      onClick={() => handleDeleteUser(user.id)}
-                    >
-                      🗑️
-                    </button>
-                  </div>
+                    primary={user.username}
+                    secondary={user.display_name}
+                    onRemove={() => handleDeleteUser(user.id)}
+                  />
                 ))}
               </div>
             )}
@@ -248,10 +349,12 @@ export default function Settings() {
 
       {/* Backups */}
       {activeTab === 'backups' && (
-        <div className="space-y-4">
-          <div className="card">
+        <div>
+          <div className="card" style={{ marginBottom: '1rem' }}>
             <div className="flex items-center justify-between">
-              <h3 className="font-medium">备份列表 ({backups.length})</h3>
+              <h3 style={{ fontSize: 14, fontWeight: 600 }}>
+                备份列表 ({backups.length})
+              </h3>
               <button
                 className="btn btn-primary btn-sm"
                 onClick={handleCreateBackup}
@@ -263,35 +366,19 @@ export default function Settings() {
           </div>
 
           {backups.length === 0 ? (
-            <div className="card text-center text-gray-400 py-8">暂无备份</div>
+            <div className="card" style={{ textAlign: 'center', padding: '2rem 0', color: 'var(--apple-text-tertiary)', fontSize: 13 }}>
+              暂无备份
+            </div>
           ) : (
             <div className="card">
-              <div className="space-y-2">
+              <div>
                 {backups.map((backup) => (
-                  <div
+                  <ListItem
                     key={backup.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded"
-                  >
-                    <div>
-                      <span className="font-medium">
-                        {backup.description || '自动备份'}
-                      </span>
-                      <span className="text-sm text-gray-400 ml-2">
-                        {new Date(backup.created_at).toLocaleString()}
-                      </span>
-                      {backup.size && (
-                        <span className="text-xs text-gray-400 ml-2">
-                          ({(backup.size / 1024).toFixed(1)} KB)
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      className="p-1 text-red-400 hover:text-red-600 transition"
-                      onClick={() => handleDeleteBackup(backup.id)}
-                    >
-                      🗑️
-                    </button>
-                  </div>
+                    primary={backup.description || '自动备份'}
+                    secondary={`${new Date(backup.created_at).toLocaleString()}${backup.size ? ` (${(backup.size / 1024).toFixed(1)} KB)` : ''}`}
+                    onRemove={() => handleDeleteBackup(backup.id)}
+                  />
                 ))}
               </div>
             </div>

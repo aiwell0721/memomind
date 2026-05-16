@@ -49,21 +49,70 @@ export default function Tags() {
     return tagList.flatMap((tag) => [
       <div
         key={tag.id}
-        className="flex items-center justify-between py-2 px-3 hover:bg-gray-50 rounded group"
-        style={{ paddingLeft: `${level * 1.5 + 0.75}rem` }}
+        className="group"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0.5rem 0.75rem',
+          paddingLeft: `${level * 1.5 + 0.75}rem`,
+          borderRadius: 8,
+          transition: 'background 0.15s',
+          cursor: 'default',
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0,0,0,0.02)')}
+        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
       >
         <div className="flex items-center gap-2">
-          <span className="text-lg">{level === 0 ? '📁' : '📂'}</span>
-          <span className="font-medium">{tag.name}</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+            {level === 0 ? (
+              <>
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+              </>
+            ) : (
+              <>
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+              </>
+            )}
+          </svg>
+          <span style={{ fontSize: 13, fontWeight: 500 }}>{tag.name}</span>
           {tag.children && tag.children.length > 0 && (
-            <span className="text-xs text-gray-400">({tag.children.length} 子标签)</span>
+            <span style={{ fontSize: 11, color: 'var(--apple-text-tertiary)' }}>
+              ({tag.children.length} 子标签)
+            </span>
           )}
         </div>
         <button
-          className="opacity-0 group-hover:opacity-100 p-1 text-red-400 hover:text-red-600 transition"
           onClick={() => handleDelete(tag.id)}
+          style={{
+            opacity: 0,
+            transition: 'opacity 0.15s',
+            width: 24,
+            height: 24,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 6,
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            color: 'var(--apple-text-tertiary)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = '1';
+            e.currentTarget.style.background = 'var(--danger-bg)';
+            e.currentTarget.style.color = 'var(--danger)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = '0';
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = 'var(--apple-text-tertiary)';
+          }}
         >
-          🗑️
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
         </button>
       </div>,
       ...(tag.children ? renderTagTree(tag.children, level + 1) : []),
@@ -71,20 +120,27 @@ export default function Tags() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">🏷️ 标签管理</h1>
-      </div>
+    <div className="fade-in" style={{ padding: '2rem', maxWidth: 600, margin: '0 auto' }}>
+      <h1 style={{ fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.021em', marginBottom: '1.5rem' }}>
+        标签管理
+      </h1>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+        <div style={{
+          marginBottom: '1rem',
+          padding: '0.75rem 1rem',
+          background: 'var(--danger-bg)',
+          borderRadius: 10,
+          color: 'var(--danger)',
+          fontSize: 13,
+        }}>
           {error}
         </div>
       )}
 
       {/* Create tag */}
-      <div className="card mb-4">
-        <h3 className="font-medium mb-3">新建标签</h3>
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>新建标签</h3>
         <div className="flex gap-2">
           <input
             type="text"
@@ -106,11 +162,15 @@ export default function Tags() {
 
       {/* Tags tree */}
       <div className="card">
-        <h3 className="font-medium mb-3">标签树 ({tags.length})</h3>
+        <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
+          标签树 ({tags.length})
+        </h3>
         {tags.length === 0 ? (
-          <p className="text-gray-400 text-center py-4">暂无标签</p>
+          <p style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--apple-text-tertiary)', fontSize: 13 }}>
+            暂无标签
+          </p>
         ) : (
-          <div className="space-y-0">{renderTagTree(tags)}</div>
+          <div>{renderTagTree(tags)}</div>
         )}
       </div>
     </div>
