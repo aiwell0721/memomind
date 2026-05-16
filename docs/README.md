@@ -1,8 +1,8 @@
-# MemoMind 发布文档
+# MemoMind 产品文档
 
-> 产品发布相关文档：部署指南、用户手册、API参考、快速入门、故障排查。
+> 面向用户和运维的文档：部署指南、用户手册、API参考、快速入门、故障排查。
 
-**注意**：产品概念、架构设计、详细设计、开发计划等文档请查看 [docs-project/README.md](../docs-project/README.md)。
+**注意**：产品概念、架构设计、详细设计、开发计划、测试等项目文档请查看 [docs-project/README.md](../docs-project/README.md)。
 
 ## 文档列表
 
