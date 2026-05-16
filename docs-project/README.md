@@ -67,7 +67,7 @@ docs-project/
 | 03 | [MCP工具规范](./04-detailed-design/03-MCP工具规范.md) | MCP Server 工具定义 |
 | 04 | [CLI工具设计](./04-detailed-design/04-CLI工具设计.md) | 命令行接口设计 |
 | 05 | [工具API设计](./04-detailed-design/05-工具API设计.md) | Tool API 详细规范 |
-| 06 | [数据模型设计](./04-detailed-design/08-数据模型设计.md) | 数据库模型 |
+| 06 | [数据模型设计](./04-detailed-design/06-数据模型设计.md) | 数据库模型 |
 
 ## 第5类：产品开发计划 (`05-development-plan/`)
 
