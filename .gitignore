@@ -36,3 +36,9 @@ Thumbs.db
 
 # Env
 .env
+
+# Runtime
+logs/
+*.db-shm
+*.db-wal
+
