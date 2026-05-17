@@ -300,7 +300,7 @@ class ActivityService:
         """
         cursor = self.db.execute("""
             DELETE FROM activity_log
-            WHERE created_at < datetime('now', ?)
+            WHERE created_at <= datetime('now', ?)
         """, (f'-{days} days',))
         self.db.commit()
         return cursor.rowcount

@@ -13,15 +13,15 @@
 
 **请求头：**
 ```
-Authorization: Bearer <token>
+Authorization: Bearer <jwt_token>
 ```
 
-**Token 格式：** hex 编码的 `username:expire_timestamp`，默认有效期 24 小时。
+**Token 格式：** JWT（HS256 签名），包含 `sub`（用户名）和 `exp`（过期时间）。
 
 **环境变量：**
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `MEMOMIND_SECRET_KEY` | 随机生成 | 密钥 |
+| `MEMOMIND_SECRET_KEY` | 随机生成（启动时） | JWT 签名密钥，生产环境必须设置 |
 | `MEMOMIND_TOKEN_EXPIRE` | 24 | Token 有效期（小时） |
 | `MEMOMIND_CORS_ORIGINS` | `*` | CORS 允许的来源 |
 | `MEMOMIND_ALLOWED_HOSTS` | 空 | 信任的主机列表 |
@@ -54,19 +54,22 @@ Authorization: Bearer <token>
 
 ### `POST /api/auth/login`
 
-无需认证。
+无需认证。用户登录，验证密码后返回 JWT。
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `username` | string | ✅ | 用户名 |
+| `password` | string | ✅ | 密码 |
 
 **响应：**
 ```json
 {
-  "access_token": "hex_encoded_token",
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
   "token_type": "bearer"
 }
 ```
+
+返回 401 如果用户名或密码错误。
 
 ### `GET /api/auth/me`
 
@@ -273,6 +276,7 @@ Authorization: Bearer <token>
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `username` | string | ✅ | 用户名（3-100 字符） |
+| `password` | string | ✅ | 密码（最少 6 字符） |
 | `display_name` | string | 否 | 显示名 |
 
 返回 409 如果用户名已存在。

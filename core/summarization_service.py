@@ -13,10 +13,11 @@ from .tokenizer import get_tokenizer
 
 class SummarizationService:
     """笔记摘要生成服务"""
-    
-    def __init__(self, db: Database):
+
+    def __init__(self, db: Database, provider=None):
         self.db = db
         self.tokenizer = get_tokenizer()
+        self.provider = provider
     
     def summarize(self, note_id: int, max_length: int = 200, method: str = 'extractive') -> Optional[str]:
         """为笔记生成摘要"""
@@ -24,11 +25,21 @@ class SummarizationService:
         row = cursor.fetchone()
         if not row:
             return None
-        
+
         title, content = row
         if len(content) <= max_length:
             return content
-        
+
+        # 先尝试 AI Provider
+        if self.provider:
+            try:
+                ai_summary = self.provider.summarize(content, max_length)
+                if ai_summary and ai_summary.strip():
+                    return ai_summary.strip()
+            except Exception:
+                pass
+
+        # Fallback 到本地方法
         if method == 'extractive':
             return self._extractive_summarize(title, content, max_length)
         else:

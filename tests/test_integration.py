@@ -64,9 +64,9 @@ class TestFullWorkflow:
         10. 备份
         """
         # 1. 创建用户
-        alice_id = self.users.create_user("alice", "Alice Wang")
-        bob_id = self.users.create_user("bob", "Bob Li")
-        charlie_id = self.users.create_user("charlie", "Charlie Zhang")
+        alice_id = self.users.create_user("alice", "password123", "Alice Wang")
+        bob_id = self.users.create_user("bob", "password123", "Bob Li")
+        charlie_id = self.users.create_user("charlie", "password123", "Charlie Zhang")
         
         # 2. 创建工作区
         eng_ws_id = self.ws.create_workspace("工程部", "工程知识库")
@@ -213,9 +213,9 @@ class TestFullWorkflow:
     def test_permission_check(self):
         """权限检查测试"""
         ws_id = self.ws.create_workspace("权限测试")
-        owner_id = self.users.create_user("owner1")
-        editor_id = self.users.create_user("editor1")
-        viewer_id = self.users.create_user("viewer1")
+        owner_id = self.users.create_user("owner1", "password123")
+        editor_id = self.users.create_user("editor1", "password123")
+        viewer_id = self.users.create_user("viewer1", "password123")
         
         self.users.add_member(ws_id, owner_id, 'owner')
         self.users.add_member(ws_id, editor_id, 'editor')
@@ -231,7 +231,7 @@ class TestFullWorkflow:
         assert self.users.can_view(viewer_id, ws_id) is True
         
         # 非成员无权限
-        stranger_id = self.users.create_user("stranger")
+        stranger_id = self.users.create_user("stranger", "password123")
         assert self.users.can_view(stranger_id, ws_id) is False
         assert self.users.can_edit(stranger_id, ws_id) is False
     
@@ -269,7 +269,7 @@ class TestFullWorkflow:
     def test_activity_audit_trail(self):
         """活动审计追踪测试"""
         ws_id = self.ws.create_workspace("审计测试")
-        user_id = self.users.create_user("auditor")
+        user_id = self.users.create_user("auditor", "password123")
         self.users.add_member(ws_id, user_id, 'owner')
         
         # 模拟一系列操作
@@ -360,8 +360,8 @@ class TestRESTAPIIntegration:
     
     def _login(self, username="testuser"):
         """登录获取 Token"""
-        self.client.post("/api/users", json={"username": username, "display_name": "Test"})
-        resp = self.client.post("/api/auth/login", json={"username": username})
+        self.client.post("/api/users", json={"username": username, "password": "testpass123", "display_name": "Test"})
+        resp = self.client.post("/api/auth/login", json={"username": username, "password": "testpass123"})
         return resp.json()["access_token"]
     
     def test_full_api_workflow(self):
@@ -377,7 +377,7 @@ class TestRESTAPIIntegration:
         ws_id = ws.json()["id"]
         
         # 2. 注册用户并添加成员
-        self.client.post("/api/users", json={"username": "bob"})
+        self.client.post("/api/users", json={"username": "bob", "password": "testpass123"})
         users = self.client.get("/api/users", headers=headers).json()
         bob_id = [u for u in users if u['username'] == 'bob'][0]['id']
         
@@ -474,7 +474,7 @@ class TestCrossModuleInteraction:
     def test_note_lifecycle(self):
         """笔记生命周期：创建→标签→链接→版本→删除"""
         ws_id = self.ws.create_workspace("生命周期测试")
-        user_id = self.users.create_user("lifecycle_user")
+        user_id = self.users.create_user("lifecycle_user", "password123")
         self.users.add_member(ws_id, user_id, 'owner')
         
         # 创建
@@ -546,7 +546,7 @@ class TestCrossModuleInteraction:
         """工作区生命周期：创建→添加成员→创建笔记→移动笔记→删除"""
         ws1 = self.ws.create_workspace("源工作区")
         ws2 = self.ws.create_workspace("目标工作区")
-        user_id = self.users.create_user("ws_lifecycle")
+        user_id = self.users.create_user("ws_lifecycle", "password123")
         
         self.users.add_member(ws1, user_id, 'owner')
         self.users.add_member(ws2, user_id, 'owner')

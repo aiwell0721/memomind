@@ -37,10 +37,10 @@ def token(app):
 def setup_data(client, token):
     """设置测试数据：注册用户、创建工作区、添加成员"""
     headers = {"Authorization": f"Bearer {token}"}
-    
-    # 注册用户
-    client.post("/api/users", json={"username": "alice", "display_name": "Alice"})
-    client.post("/api/users", json={"username": "bob", "display_name": "Bob"})
+
+    # 注册用户（带密码）
+    client.post("/api/users", json={"username": "alice", "password": "testpass123", "display_name": "Alice"})
+    client.post("/api/users", json={"username": "bob", "password": "testpass123", "display_name": "Bob"})
     
     # 创建工作区
     ws = client.post("/api/workspaces", json={"name": "工程部", "description": "工程知识库"}, headers=headers)
@@ -71,17 +71,17 @@ class TestHealthAndAuth:
     def test_login(self, client):
         """登录"""
         # 先注册用户
-        client.post("/api/users", json={"username": "testuser", "display_name": "Test"})
-        
-        resp = client.post("/api/auth/login", json={"username": "testuser"})
+        client.post("/api/users", json={"username": "testuser", "password": "testpass123", "display_name": "Test"})
+
+        resp = client.post("/api/auth/login", json={"username": "testuser", "password": "testpass123"})
         assert resp.status_code == 200
         data = resp.json()
         assert 'access_token' in data
         assert data['token_type'] == 'bearer'
-    
+
     def test_login_nonexistent_user(self, client):
         """登录不存在的用户"""
-        resp = client.post("/api/auth/login", json={"username": "nobody"})
+        resp = client.post("/api/auth/login", json={"username": "nobody", "password": "anypass"})
         assert resp.status_code == 401
     
     def test_unauthorized_access(self, client):
@@ -306,7 +306,7 @@ class TestMembersAPI:
         headers = setup_data["headers"]
         
         # 创建新用户
-        client.post("/api/users", json={"username": "charlie"})
+        client.post("/api/users", json={"username": "charlie", "password": "testpass123"})
         users = client.get("/api/users", headers=headers).json()
         charlie_id = [u for u in users if u['username'] == 'charlie'][0]['id']
         

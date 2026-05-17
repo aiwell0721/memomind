@@ -29,17 +29,23 @@ class RAGAnswer:
 
 class RAGService:
     """RAG 问答服务"""
-    
-    def __init__(self, db: Database):
+
+    def __init__(self, db: Database, provider=None):
         """
         初始化 RAG 服务
-        
+
         Args:
             db: 数据库实例
+            provider: AI Provider（可选，默认 None 则使用本地算法）
         """
         self.db = db
         self.semantic = SemanticService(db)
         self.tokenizer = get_tokenizer()
+        self.provider = provider
+
+        # 将 provider 传递给 semantic 服务
+        if provider:
+            self.semantic.provider = provider
     
     def ask(
         self,
@@ -144,18 +150,27 @@ class RAGService:
         results: List
     ) -> Tuple[str, float]:
         """
-        生成回答（基于抽取式和生成式混合）
-        
-        Returns:
-            (回答, 置信度)
+        生成回答。
+
+        优先级：
+        1. 如果有 AI Provider，先尝试 provider.answer()
+        2. 失败则 fallback 到本地抽取式/摘要式回答
         """
-        # 方法 1：抽取式回答（直接引用相关内容）
+        # 先尝试 AI Provider
+        if self.provider:
+            try:
+                ai_answer = self.provider.answer(question, context)
+                if ai_answer and ai_answer.strip():
+                    # Provider 回答成功，给高置信度
+                    return ai_answer.strip(), 0.85
+            except Exception:
+                # Provider 失败，fallback 到本地方法
+                pass
+
+        # 本地 fallback
         extractive_answer, extractive_confidence = self._extractive_answer(question, results)
-        
-        # 方法 2：摘要式回答（总结相关内容）
         abstractive_answer, abstractive_confidence = self._abstractive_answer(question, results)
-        
-        # 选择置信度更高的回答
+
         if extractive_confidence >= abstractive_confidence:
             return extractive_answer, extractive_confidence
         else:

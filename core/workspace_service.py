@@ -49,7 +49,7 @@ class WorkspaceService:
         # 创建工作区表
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS workspaces (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id INTEGER PRIMARY KEY AUTOINCREMENT CHECK(id > 0),
                 name TEXT NOT NULL UNIQUE,
                 description TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -91,14 +91,17 @@ class WorkspaceService:
     def create_workspace(self, name: str, description: str = '') -> int:
         """
         创建工作区
-        
+
         Args:
-            name: 工作区名称（唯一）
+            name: 工作区名称（唯一，不可为空）
             description: 工作区描述
-            
+
         Returns:
             新工作区 ID
         """
+        if not name or not name.strip():
+            raise ValueError("工作区名称不能为空")
+
         cursor = self.db.execute("""
             INSERT INTO workspaces (name, description)
             VALUES (?, ?)
@@ -344,9 +347,13 @@ class WorkspaceService:
             params = list(workspace_ids)
         
         # 先做 FTS 搜索，再关联工作区信息
-        # 如果查询只包含 ASCII 字符，用短语匹配避免 jieba 拆分
+        # ASCII 查询用前缀匹配（jieba 可能将英文与相邻中文合并为一个 token）
         if query.strip().isascii():
-            fts_query = '"' + query.strip().replace('"', '') + '"'
+            stripped = query.strip().replace('"', '')
+            if stripped:
+                fts_query = stripped + '*'
+            else:
+                fts_query = ''
         else:
             from .tokenizer import get_tokenizer
             tokenizer = get_tokenizer()

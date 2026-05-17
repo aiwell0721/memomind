@@ -25,10 +25,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 export const api = {
   // Auth
-  login: (username: string) => request<{ access_token: string }>('/auth/login', {
+  login: (username: string, password: string) => request<{ access_token: string }>('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ username }),
+    body: JSON.stringify({ username, password }),
   }),
+  register: (username: string, password: string, display_name?: string) =>
+    request<User>('/users', {
+      method: 'POST',
+      body: JSON.stringify({ username, password, display_name: display_name || username }),
+    }),
   me: () => request<Record<string, unknown>>('/auth/me'),
 
   // Notes
@@ -94,8 +99,8 @@ export const api = {
 
   // Users
   users: () => request<User[]>('/users'),
-  createUser: (username: string, display_name = '') =>
-    request<User>('/users', { method: 'POST', body: JSON.stringify({ username, display_name }) }),
+  createUser: (username: string, password: string, display_name = '') =>
+    request<User>('/users', { method: 'POST', body: JSON.stringify({ username, password, display_name }) }),
   deleteUser: (id: number) => request(`/users/${id}`, { method: 'DELETE' }),
 
   // Activity

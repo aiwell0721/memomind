@@ -137,12 +137,16 @@ class CollaborationService:
 
     async def handle_connection(
         self, websocket, note_id: int,
-        user_id: int, username: str
+        user_id: int, username: str,
+        db=None
     ):
         """
         处理 WebSocket 连接的完整生命周期
 
         接入 → 加入房间 → 心跳/消息循环 → 离开房间 → 断开
+
+        Args:
+            db: 数据库实例（用于编辑持久化）
         """
         await self.join_room(note_id, websocket, user_id, username)
 
@@ -169,6 +173,17 @@ class CollaborationService:
                     continue
 
                 if data.get('type') == 'edit':
+                    # 持久化编辑到数据库
+                    if db:
+                        try:
+                            db.execute(
+                                "UPDATE notes SET title = ?, content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                                (data.get('title', ''), data.get('content', ''), note_id)
+                            )
+                            db.commit()
+                        except Exception:
+                            pass  # 持久化失败不影响广播
+
                     # 广播编辑变更
                     await self.broadcast_edit(
                         note_id, websocket, user_id,

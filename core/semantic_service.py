@@ -18,15 +18,17 @@ from .tokenizer import get_tokenizer
 class SemanticService:
     """语义搜索服务（TF-IDF + 余弦相似度）"""
     
-    def __init__(self, db: Database):
+    def __init__(self, db: Database, provider=None):
         """
         初始化语义搜索服务
-        
+
         Args:
             db: 数据库实例
+            provider: AI Provider（可选，支持 embedding 增强）
         """
         self.db = db
         self.tokenizer = get_tokenizer()
+        self.provider = provider
         # IDF 缓存
         self._idf_cache: Dict[str, float] = {}
         self._doc_count: int = 0

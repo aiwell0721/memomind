@@ -73,7 +73,7 @@ class TestActivityTimeline:
         
         # 准备数据
         self.ws_id = self.ws.create_workspace("研发部")
-        self.user_id = self.users.create_user("alice", "Alice")
+        self.user_id = self.users.create_user("alice", "password123", "Alice")
         self.users.add_member(self.ws_id, self.user_id, 'owner')
     
     def teardown_method(self):
@@ -101,7 +101,7 @@ class TestActivityTimeline:
     
     def test_timeline_by_user(self):
         """按用户过滤"""
-        user2_id = self.users.create_user("bob")
+        user2_id = self.users.create_user("bob", "password123")
         
         self.activity.log('create', self.user_id, self.ws_id, 1)
         self.activity.log('create', user2_id, self.ws_id, 2)

@@ -186,7 +186,7 @@ class TestWebSocketEndpoint:
         from core.api_server import generate_token
         token = generate_token("testuser")
         # 先注册用户
-        client.post("/api/users", json={"username": "testuser", "display_name": "Test"})
+        client.post("/api/users", json={"username": "testuser", "password": "testpass123", "display_name": "Test"})
 
         with pytest.raises(Exception):
             with client.websocket_connect(f"/ws/notes/999?token={token}"):
@@ -196,7 +196,7 @@ class TestWebSocketEndpoint:
         """WebSocket 连接 + 编辑广播"""
         from core.api_server import generate_token
         # 注册用户
-        client.post("/api/users", json={"username": "alice", "display_name": "Alice"})
+        client.post("/api/users", json={"username": "alice", "password": "testpass123", "display_name": "Alice"})
         token = generate_token("alice")
 
         # 创建笔记
@@ -221,3 +221,60 @@ class TestWebSocketEndpoint:
             # 收到 ping 心跳
             data = ws.receive_json()
             assert data['type'] == 'ping'
+
+    def test_websocket_edit_persisted_to_db(self, client):
+        """WebSocket 编辑内容应持久化到数据库"""
+        from core.api_server import generate_token
+        client.post("/api/users", json={"username": "persist_user", "password": "testpass123", "display_name": "Test"})
+        token = generate_token("persist_user")
+
+        # 创建笔记
+        headers = {"Authorization": f"Bearer {token}"}
+        resp = client.post("/api/notes", json={
+            "title": "持久化测试",
+            "content": "初始内容",
+            "tags": []
+        }, headers=headers)
+        note_id = resp.json()["id"]
+
+        # WebSocket 编辑
+        with client.websocket_connect(f"/ws/notes/{note_id}?token={token}") as ws:
+            ws.send_json({"type": "edit", "title": "新标题", "content": "持久化后的内容"})
+            ws.receive_json()  # user_joined
+
+        # 验证：通过 REST API 获取笔记，内容应该是更新后的
+        import time
+        time.sleep(0.5)  # 等待异步持久化
+        resp = client.get(f"/api/notes/{note_id}", headers=headers)
+        data = resp.json()
+        assert data['title'] == "新标题", f"标题未更新，实际为: {data['title']}"
+        assert data['content'] == "持久化后的内容", f"内容未更新，实际为: {data['content']}"
+
+    def test_websocket_denies_non_member(self, client):
+        """非工作区成员连接被拒绝"""
+        from core.api_server import generate_token
+        # 注册两个用户
+        client.post("/api/users", json={"username": "owner", "password": "testpass123", "display_name": "Owner"})
+        client.post("/api/users", json={"username": "stranger", "password": "testpass123", "display_name": "Stranger"})
+        owner_token = generate_token("owner")
+        stranger_token = generate_token("stranger")
+
+        # Owner 创建工作区和笔记
+        headers = {"Authorization": f"Bearer {owner_token}"}
+        ws = client.post("/api/workspaces", json={"name": "私有区"}, headers=headers)
+        ws_id = ws.json()["id"]
+
+        # 添加 owner 为成员（stranger 不加入）
+        owner = client.get("/api/users?limit=100", headers=headers).json()
+        owner_id = [u for u in owner if u['username'] == 'owner'][0]['id']
+        client.post(f"/api/workspaces/{ws_id}/members", json={"user_id": owner_id, "role": "owner"}, headers=headers)
+
+        note = client.post("/api/notes", json={
+            "title": "私有笔记", "content": "内容", "workspace_id": ws_id, "tags": []
+        }, headers=headers)
+        note_id = note.json()["id"]
+
+        # Stranger 尝试连接 WebSocket
+        with pytest.raises(Exception):
+            with client.websocket_connect(f"/ws/notes/{note_id}?token={stranger_token}"):
+                pass

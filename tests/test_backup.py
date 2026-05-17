@@ -119,7 +119,7 @@ class TestBackupService:
         """导出为 JSON"""
         # 添加数据
         self.ws.create_workspace('测试区')
-        self.users.create_user('alice')
+        self.users.create_user('alice', 'password123')
         
         output = self.backup.export_to_json()
         assert output.endswith('.json')

@@ -3,6 +3,7 @@ MemoMind 用户系统服务
 支持用户注册、角色管理、工作区成员管理
 """
 
+import bcrypt
 import json
 from typing import List, Optional, Dict
 from dataclasses import dataclass
@@ -14,9 +15,10 @@ class User:
     """用户数据模型"""
     id: Optional[int] = None
     username: str = ""
+    password_hash: Optional[str] = None
     display_name: str = ""
     created_at: Optional[str] = None
-    
+
     def to_dict(self) -> Dict:
         return {
             'id': self.id,
@@ -24,12 +26,13 @@ class User:
             'display_name': self.display_name,
             'created_at': self.created_at
         }
-    
+
     @classmethod
     def from_row(cls, row) -> 'User':
         return cls(
             id=row['id'],
             username=row['username'],
+            password_hash=row['password_hash'] if 'password_hash' in row.keys() else None,
             display_name=row['display_name'] or '',
             created_at=row['created_at']
         )
@@ -47,16 +50,24 @@ class UserService:
     def _init_schema(self):
         """初始化用户相关表结构"""
         cursor = self.db.conn
-        
+
         # 创建用户表
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL DEFAULT '',
                 display_name TEXT DEFAULT '',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        # 兼容旧数据库：如果 password_hash 列不存在，添加它
+        info_cursor = self.db.conn.cursor()
+        info_cursor.execute("PRAGMA table_info(users)")
+        columns = [col['name'] for col in info_cursor.fetchall()]
+        if 'password_hash' not in columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''")
         
         # 创建工作区成员表
         cursor.execute("""
@@ -93,23 +104,51 @@ class UserService:
         
         self.db.commit()
     
-    def create_user(self, username: str, display_name: str = '') -> int:
+    def create_user(self, username: str, password: str, display_name: str = '') -> int:
         """
         注册用户
-        
+
         Args:
             username: 用户名（唯一）
+            password: 明文密码
             display_name: 显示名称
-            
+
         Returns:
             新用户 ID
         """
+        password_hash = self._hash_password(password)
         cursor = self.db.execute("""
-            INSERT INTO users (username, display_name)
-            VALUES (?, ?)
-        """, (username, display_name))
+            INSERT INTO users (username, password_hash, display_name)
+            VALUES (?, ?, ?)
+        """, (username, password_hash, display_name))
         self.db.commit()
         return cursor.lastrowid
+
+    @staticmethod
+    def _hash_password(password: str) -> str:
+        """使用 bcrypt 哈希密码"""
+        return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+    def verify_password(self, username: str, password: str) -> Optional[User]:
+        """
+        验证用户密码
+
+        Args:
+            username: 用户名
+            password: 明文密码
+
+        Returns:
+            验证成功返回 User 对象，失败返回 None
+        """
+        user = self.get_user_by_username(username)
+        if not user or not user.password_hash:
+            return None
+        try:
+            if bcrypt.checkpw(password.encode('utf-8'), user.password_hash.encode('utf-8')):
+                return user
+        except Exception:
+            pass
+        return None
     
     def get_user(self, user_id: int) -> Optional[User]:
         """

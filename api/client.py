@@ -18,6 +18,7 @@ from ..core.user_service import UserService
 from ..core.rag_service import RAGService
 from ..core.summarization_service import SummarizationService
 from ..core.activity_service import ActivityService
+from ..core.ai_provider import create_provider
 
 
 class NotesAPI:
@@ -342,6 +343,7 @@ class MemoMind:
         self.db = Database(db_path)
         
         # 初始化服务
+        ai_provider = create_provider()
         search = SearchService(self.db)
         versions = VersionService(self.db)
         tags = TagService(self.db)
@@ -350,8 +352,8 @@ class MemoMind:
         importer = ImportService(self.db)
         workspaces = WorkspaceService(self.db)
         users = UserService(self.db)
-        rag = RAGService(self.db)
-        summarizer = SummarizationService(self.db)
+        rag = RAGService(self.db, provider=ai_provider)
+        summarizer = SummarizationService(self.db, provider=ai_provider)
         activity = ActivityService(self.db)
         
         # 初始化 API

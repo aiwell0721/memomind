@@ -5,6 +5,8 @@ import { api } from '../lib/api';
 
 export default function Login() {
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -16,17 +18,38 @@ export default function Login() {
       setError('请输入用户名');
       return;
     }
+    if (!password.trim()) {
+      setError('请输入密码');
+      return;
+    }
+    if (mode === 'register' && password.length < 6) {
+      setError('密码至少 6 个字符');
+      return;
+    }
 
     setLoading(true);
     setError('');
 
     try {
-      const res = await api.login(username.trim());
-      login(username.trim(), res.access_token);
+      if (mode === 'register') {
+        await api.register(username.trim(), password, username.trim());
+        // 注册成功后自动登录
+        const res = await api.login(username.trim(), password);
+        login(username.trim(), res.access_token);
+      } else {
+        const res = await api.login(username.trim(), password);
+        login(username.trim(), res.access_token);
+      }
       navigate('/');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '登录失败';
-      setError(message.includes('401') ? '用户不存在' : message);
+      const message = err instanceof Error ? err.message : (mode === 'register' ? '注册失败' : '登录失败');
+      if (message.includes('401')) {
+        setError(mode === 'register' ? '注册失败' : '用户名或密码错误');
+      } else if (message.includes('409')) {
+        setError('用户名已存在');
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -61,7 +84,7 @@ export default function Login() {
           </p>
         </div>
 
-        {/* Login card */}
+        {/* Card */}
         <div className="card" style={{ padding: '2rem' }}>
           <h2 style={{
             fontSize: '1.125rem',
@@ -69,7 +92,7 @@ export default function Login() {
             marginBottom: '1.5rem',
             letterSpacing: '-0.01em',
           }}>
-            登录
+            {mode === 'login' ? '登录' : '注册'}
           </h2>
 
           <form onSubmit={handleSubmit}>
@@ -92,6 +115,27 @@ export default function Login() {
                 className="input"
                 placeholder="输入用户名"
                 autoFocus
+              />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: 'var(--apple-text-secondary)',
+                  marginBottom: 6,
+                }}
+              >
+                密码
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="input"
+                placeholder="输入密码"
               />
             </div>
 
@@ -127,33 +171,23 @@ export default function Login() {
                 letterSpacing: '-0.01em',
               }}
             >
-              {loading ? '登录中...' : '登录'}
+              {loading ? (mode === 'register' ? '注册中...' : '登录中...') : (mode === 'register' ? '注册' : '登录')}
             </button>
           </form>
-        </div>
 
-        {/* Hint */}
-        <div style={{
-          marginTop: 20,
-          padding: '0.875rem 1rem',
-          background: 'rgba(0,0,0,0.02)',
-          borderRadius: 10,
-          fontSize: 12,
-          color: 'var(--apple-text-secondary)',
-          lineHeight: 1.6,
-        }}>
-          <p>提示：首次使用请先注册（通过 API 或 CLI）</p>
-          <code style={{
-            display: 'block',
-            marginTop: 6,
-            background: 'rgba(0,0,0,0.04)',
-            padding: '0.25rem 0.5rem',
-            borderRadius: 4,
-            fontSize: 11,
-            fontFamily: '"SF Mono", Menlo, monospace',
-          }}>
-            python cli.py create-user --username demo
-          </code>
+          <div style={{ marginTop: 16, textAlign: 'center' }}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                setMode(mode === 'login' ? 'register' : 'login');
+                setError('');
+              }}
+              style={{ fontSize: 13 }}
+            >
+              {mode === 'login' ? '没有账号？注册' : '已有账号？登录'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

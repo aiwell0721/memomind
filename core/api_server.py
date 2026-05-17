@@ -7,7 +7,7 @@ import os
 import secrets
 import time
 from typing import List, Optional, Dict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # Server start time for uptime tracking
@@ -33,6 +33,7 @@ from .activity_service import ActivityService
 from .conflict_service import ConflictService
 from .backup_service import BackupService
 from .collaboration_service import CollaborationService
+from .ai_provider import create_provider
 
 
 # ==================== Pydantic 模型 ====================
@@ -41,7 +42,7 @@ class NoteCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=500)
     content: str = Field(..., min_length=1)
     tags: Optional[List[str]] = []
-    workspace_id: Optional[int] = 1
+    workspace_id: Optional[int] = None
 
 class NoteUpdate(BaseModel):
     title: Optional[str] = None
@@ -68,6 +69,7 @@ class WorkspaceUpdate(BaseModel):
 
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=3, max_length=100)
+    password: str = Field(..., min_length=6)
     display_name: str = ""
 
 class UserUpdate(BaseModel):
@@ -109,7 +111,7 @@ class BackupCreate(BaseModel):
 
 class LoginRequest(BaseModel):
     username: str
-    # 简化版：无密码，仅用于身份标识
+    password: str
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -121,34 +123,35 @@ class ErrorResponse(BaseModel):
 
 # ==================== 认证 ====================
 
+from jose import JWTError, jwt
+from jose.exceptions import ExpiredSignatureError
+
 SECRET_KEY = os.environ.get("MEMOMIND_SECRET_KEY", secrets.token_hex(32))
 TOKEN_EXPIRE_HOURS = int(os.environ.get("MEMOMIND_TOKEN_EXPIRE", 24))
+ALGORITHM = "HS256"
 
 security = HTTPBearer()
 
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
-    """
-    简化的 JWT 验证（实际应使用 python-jose）
-    
-    Token 格式：hex(username:expire_timestamp)
-    """
+    """验证 JWT Token"""
     token = credentials.credentials
-    
+
     try:
-        import binascii
-        decoded = bytes.fromhex(token).decode('utf-8')
-        username, expire_str = decoded.rsplit(':', 1)
-        expire_ts = int(expire_str)
-        
-        if datetime.now().timestamp() > expire_ts:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token 已过期"
+                detail="无效 Token"
             )
-        
         return {"username": username}
-    except (ValueError, binascii.Error):
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token 已过期"
+        )
+    except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="无效 Token"
@@ -156,10 +159,13 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) 
 
 
 def generate_token(username: str) -> str:
-    """生成认证 Token"""
-    expire_ts = int((datetime.now() + timedelta(hours=TOKEN_EXPIRE_HOURS)).timestamp())
-    raw = f"{username}:{expire_ts}"
-    return raw.encode('utf-8').hex()
+    """生成 JWT Token"""
+    expire = datetime.now(timezone.utc) + timedelta(hours=TOKEN_EXPIRE_HOURS)
+    payload = {
+        "sub": username,
+        "exp": expire
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
 # ==================== 应用初始化 ====================
@@ -276,6 +282,7 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
     conflict = ConflictService(db)
     backup = BackupService(db)
     collaboration = CollaborationService(db)
+    ai_provider = create_provider()
     
     # ==================== 笔记 API ====================
     
@@ -587,7 +594,7 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
     def create_user(user: UserCreate):
         """注册用户（无需认证）"""
         try:
-            user_id = users.create_user(user.username, user.display_name)
+            user_id = users.create_user(user.username, user.password, user.display_name)
             return {'id': user_id, 'username': user.username}
         except Exception as e:
             raise HTTPException(status_code=409, detail=str(e))
@@ -772,11 +779,11 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
     
     @app.post("/api/auth/login", response_model=TokenResponse, summary="登录")
     def login(req: LoginRequest):
-        """用户登录，返回 Token"""
-        user = users.get_user_by_username(req.username)
+        """用户登录，验证密码后返回 JWT Token"""
+        user = users.verify_password(req.username, req.password)
         if not user:
-            raise HTTPException(status_code=401, detail="用户不存在")
-        
+            raise HTTPException(status_code=401, detail="用户名或密码错误")
+
         token = generate_token(req.username)
         return TokenResponse(access_token=token)
     
@@ -854,18 +861,14 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
     # ==================== WebSocket 实时协作 ====================
 
     def verify_ws_token(token: str) -> Optional[dict]:
-        """验证 WebSocket Token（复用 HTTP 认证逻辑）"""
+        """验证 WebSocket Token（复用 JWT 认证逻辑）"""
         try:
-            import binascii
-            decoded = bytes.fromhex(token).decode('utf-8')
-            username, expire_str = decoded.rsplit(':', 1)
-            expire_ts = int(expire_str)
-
-            if datetime.now().timestamp() > expire_ts:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            username: str = payload.get("sub")
+            if username is None:
                 return None
-
             return {"username": username}
-        except (ValueError, binascii.Error):
+        except (ExpiredSignatureError, JWTError):
             return None
 
     @app.websocket("/ws/notes/{note_id}")
@@ -900,11 +903,28 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
 
         # 检查笔记是否存在
         cursor = db.execute("SELECT id FROM notes WHERE id = ?", (note_id,))
-        if not cursor.fetchone():
+        row = cursor.fetchone()
+        if not row:
             await websocket.close(code=4003, reason="笔记不存在")
             return
 
+        # 检查用户是否为工作区成员（如果 workspace_id 列存在）
+        info_cursor = db.execute("PRAGMA table_info(notes)")
+        columns = [col['name'] for col in info_cursor.fetchall()]
+        if 'workspace_id' in columns:
+            cursor = db.execute("SELECT workspace_id FROM notes WHERE id = ?", (note_id,))
+            ws_row = cursor.fetchone()
+            if ws_row and ws_row['workspace_id']:
+                workspace_id = ws_row['workspace_id']
+                cursor = db.execute(
+                    "SELECT 1 FROM workspace_members WHERE workspace_id = ? AND user_id = ?",
+                    (workspace_id, user_id)
+                )
+                if not cursor.fetchone():
+                    await websocket.close(code=4004, reason="无权访问该笔记")
+                    return
+
         await websocket.accept()
-        await collaboration.handle_connection(websocket, note_id, user_id, username)
+        await collaboration.handle_connection(websocket, note_id, user_id, username, db=db)
     
     return app

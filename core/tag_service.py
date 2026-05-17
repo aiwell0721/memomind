@@ -84,20 +84,24 @@ class TagService:
     
     def create_tag(self, name: str, parent_id: Optional[int] = None) -> int:
         """
-        创建标签
-        
+        创建标签（若已存在则返回已有 ID）
+
         Args:
             name: 标签名称
             parent_id: 父标签 ID（可选）
-            
+
         Returns:
             标签 ID
         """
+        existing = self.get_tag_by_name(name)
+        if existing:
+            return existing.id
+
         cursor = self.db.execute("""
             INSERT INTO tags (name, parent_id)
             VALUES (?, ?)
         """, (name, parent_id))
-        
+
         self.db.commit()
         return cursor.lastrowid
     
