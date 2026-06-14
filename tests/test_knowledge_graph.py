@@ -235,3 +235,78 @@ class TestEdgeCases:
         graph = kg.build_graph(max_nodes=100)
         assert len(graph['nodes']) == 50
         assert len(graph['edges']) >= 0
+
+
+class TestSuggestConsolidation:
+    """知识整理建议测试"""
+
+    def test_suggest_basic(self, kg):
+        """测试基本建议生成"""
+        # 插入同一主题的多条笔记
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("Python 装饰器", "装饰器用于修改函数", json.dumps(["Python", "编程"])))
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("Flask 路由", "Flask 路由装饰器用法", json.dumps(["Python", "Web"])))
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("Docker 入门", "Docker 容器化部署", json.dumps(["Docker", "部署"])))
+        kg.db.commit()
+
+        result = kg.suggest_consolidation()
+        assert 'topics' in result
+        assert 'merge_suggestions' in result
+        assert 'stale_candidates' in result
+
+    def test_suggest_empty_database(self, kg):
+        """测试空数据库"""
+        result = kg.suggest_consolidation()
+        assert result['topics'] == []
+        assert result['merge_suggestions'] == []
+        assert result['stale_candidates'] == []
+
+    def test_suggest_merge_from_high_similarity(self, kg):
+        """测试高相似度笔记出现在合并建议中"""
+        # 使用高度重叠的中文内容确保 Jaccard 相似度 > 0.1
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("Python 装饰器详解", "装饰器是 Python 的高级语法特性，用于增强函数功能而不修改函数本身。常用装饰器包括属性装饰器和类方法装饰器。", json.dumps(["Python", "编程"])))
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("Python 装饰器进阶", "Python 装饰器是高级语法特性，用于增强函数功能。装饰器可以在不修改函数本身的情况下添加额外逻辑。", json.dumps(["Python", "进阶"])))
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("烹饪技巧", "家常菜烹饪技巧分享", json.dumps(["美食", "生活"])))
+        kg.db.commit()
+
+        result = kg.suggest_consolidation(similarity_threshold=0.1)
+        # 两条 Python 装饰器笔记应触发合并建议
+        assert len(result['merge_suggestions']) > 0
+
+    def test_suggest_stale_notes(self, kg):
+        """测试陈旧笔记检测"""
+        # 插入一条"旧"笔记（手动设置旧时间戳）
+        kg.db.execute("""
+            INSERT INTO notes (title, content, tags, updated_at) VALUES (?, ?, ?, ?)
+        """, ("过时笔记", "旧版本内容", json.dumps(["旧"]), "2024-01-01 00:00:00"))
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("新笔记", "最新内容", json.dumps(["新"])))
+        kg.db.commit()
+
+        result = kg.suggest_consolidation(days_threshold=365)
+        # 超过一年的笔记应该出现在陈旧候选里
+        assert len(result['stale_candidates']) > 0
+        stale_ids = [s['note_id'] for s in result['stale_candidates']]
+        # 找到"过时笔记"
+        cursor = kg.db.execute("SELECT id FROM notes WHERE title = ?", ("过时笔记",))
+        old_id = cursor.fetchone()['id']
+        assert old_id in stale_ids
+
+    def test_suggest_communities_as_topics(self, kg):
+        """测试社区检测结果转为主题"""
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("笔记A", "内容", json.dumps(["Python", "FastAPI"])))
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("笔记B", "内容", json.dumps(["Python", "Django"])))
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("笔记C", "内容", json.dumps(["JavaScript", "React"])))
+        kg.db.commit()
+
+        result = kg.suggest_consolidation()
+        # 社区检测应发现 Python 和 JavaScript 两个主题
+        assert len(result['topics']) >= 1

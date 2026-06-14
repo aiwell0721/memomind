@@ -74,6 +74,7 @@ docs-project/
 | # | 文档 | 说明 |
 |---|------|------|
 | 01 | [Phase4开发计划](./05-development-plan/01-Phase4开发计划.md) | Phase 4 Web UI + 生产就绪 |
+| 03 | [知识图谱连通与去重消化方案](./05-development-plan/03-知识图谱连通与去重消化方案.md) | KG连通 + 去重 + 知识消化 |
 
 ## 第6类：测试文档 (`06-test-docs/`)
 

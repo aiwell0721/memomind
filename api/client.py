@@ -18,6 +18,8 @@ from ..core.user_service import UserService
 from ..core.rag_service import RAGService
 from ..core.summarization_service import SummarizationService
 from ..core.activity_service import ActivityService
+from ..core.knowledge_graph_service import KnowledgeGraphService
+from ..core.semantic_service import SemanticService
 from ..core.ai_provider import create_provider
 
 
@@ -355,6 +357,8 @@ class MemoMind:
         rag = RAGService(self.db, provider=ai_provider)
         summarizer = SummarizationService(self.db, provider=ai_provider)
         activity = ActivityService(self.db)
+        kg = KnowledgeGraphService(self.db)
+        semantic = SemanticService(self.db, provider=ai_provider)
         
         # 初始化 API
         self.notes = NotesAPI(self.db, search, versions)
@@ -367,7 +371,9 @@ class MemoMind:
         self.rag = RAGAPI(rag)
         self.summarizer = SummarizerAPI(summarizer)
         self.activity = ActivityAPI(activity)
-        self._search = search  # For suggest method
+        self._search = search
+        self._kg = kg
+        self._semantic = semantic
     
     def close(self):
         """关闭数据库连接"""

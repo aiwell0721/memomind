@@ -284,3 +284,102 @@ class KnowledgeGraphService:
             'avg_degree': avg_degree,
             'density': 2 * edge_count / max(node_count * (node_count - 1), 1)
         }
+
+    def suggest_consolidation(
+        self,
+        workspace_id: Optional[int] = None,
+        days_threshold: int = 90,
+        similarity_threshold: float = 0.6,
+        max_nodes: int = 100
+    ) -> Dict:
+        """
+        基于图谱分析给出知识整理建议
+
+        利用三个数据源：
+        1. 社区检测 → 主题聚类（topics）
+        2. 相似度边 → 合并建议（merge_suggestions）
+        3. updated_at 时间戳 → 陈旧候选（stale_candidates）
+
+        Args:
+            workspace_id: 工作区过滤
+            days_threshold: 陈旧天数阈值
+            similarity_threshold: Jaccard 相似度阈值
+            max_nodes: 最大分析节点数
+
+        Returns:
+            {
+                'topics': [{'name': str, 'note_count': int, 'note_ids': [...]}],
+                'merge_suggestions': [{'note_ids': [id, id], 'similarity': float}],
+                'stale_candidates': [{'note_id': int, 'days_since_update': int, 'title': str}]
+            }
+        """
+        # 构建图谱
+        graph = self.build_graph(workspace_id=workspace_id, max_nodes=max_nodes)
+
+        if not graph['nodes']:
+            return {'topics': [], 'merge_suggestions': [], 'stale_candidates': []}
+
+        # 1. 社区检测 → 主题聚类
+        communities = self.detect_communities(graph)
+        topic_map: Dict[str, List[int]] = defaultdict(list)
+        for node_id, community in communities.items():
+            topic_map[community].append(node_id)
+
+        topics = []
+        for name, note_ids in topic_map.items():
+            if name != 'other' and len(note_ids) >= 2:
+                topics.append({
+                    'name': name,
+                    'note_count': len(note_ids),
+                    'note_ids': note_ids
+                })
+        topics.sort(key=lambda t: t['note_count'], reverse=True)
+
+        # 2. 相似度边 → 合并建议（只取高相似度）
+        merge_suggestions = []
+        for edge in graph['edges']:
+            if edge['type'] == 'similarity' and edge['weight'] >= similarity_threshold:
+                merge_suggestions.append({
+                    'note_ids': [edge['source'], edge['target']],
+                    'similarity': round(edge['weight'], 4)
+                })
+        merge_suggestions.sort(key=lambda s: s['similarity'], reverse=True)
+
+        # 3. 时间戳 → 陈旧检测
+        from datetime import datetime, timedelta
+        stale_candidates = []
+        cutoff_date = datetime.now() - timedelta(days=days_threshold)
+
+        try:
+            if workspace_id:
+                cursor = self.db.execute(
+                    "SELECT id, title, updated_at FROM notes "
+                    "WHERE workspace_id = ? AND updated_at < ?",
+                    (workspace_id, cutoff_date.isoformat()))
+            else:
+                cursor = self.db.execute(
+                    "SELECT id, title, updated_at FROM notes WHERE updated_at < ?",
+                    (cutoff_date.isoformat(),))
+        except Exception:
+            cursor = self.db.execute(
+                "SELECT id, title, updated_at FROM notes WHERE updated_at < ?",
+                (cutoff_date.isoformat(),))
+
+        for row in cursor.fetchall():
+            row_updated = row['updated_at']
+            if isinstance(row_updated, str):
+                row_updated = datetime.fromisoformat(row_updated)
+            days_since = (datetime.now() - row_updated).days
+            stale_candidates.append({
+                'note_id': row['id'],
+                'title': row['title'],
+                'days_since_update': days_since
+            })
+
+        stale_candidates.sort(key=lambda s: s['days_since_update'], reverse=True)
+
+        return {
+            'topics': topics,
+            'merge_suggestions': merge_suggestions,
+            'stale_candidates': stale_candidates
+        }

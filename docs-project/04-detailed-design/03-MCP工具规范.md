@@ -1,8 +1,8 @@
 # MCP Server 工具列表
 
-> 最后更新：2026-05-01
+> 最后更新：2026-06-14
 
-MemoMind MCP Server 提供 **20 个工具**，供 AI Agent（Claude Desktop、OpenClaw 等）调用。
+MemoMind MCP Server 提供 **24 个工具**，供 AI Agent（Claude Desktop、OpenClaw 等）调用。
 
 ## 启动方式
 
@@ -195,6 +195,48 @@ python -m mcp_server --db memomind.db --transport http --port 8001
 |------|------|------|------|
 | `json_content` | string | ✅ | JSON 格式的笔记内容 |
 | `strategy` | string | 否 | 导入策略：`overwrite` 或 `merge`（默认 `overwrite`） |
+
+---
+
+## 知识图谱工具（2 个）
+
+### `get_knowledge_graph`
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `workspace_id` | int | 否 | 工作区过滤 |
+| `max_nodes` | int | 否 | 最大节点数（默认 100） |
+
+返回图谱数据（nodes + edges）和统计信息。
+
+### `get_graph_stats`
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `workspace_id` | int | 否 | 工作区过滤 |
+
+返回节点数、边数、边类型分布、平均度、密度。
+
+---
+
+## 去重与消化工具（2 个）
+
+### `scan_duplicates`
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `workspace_id` | int | 否 | 工作区过滤 |
+| `threshold` | float | 否 | 相似度阈值（默认 0.6） |
+
+使用 TF-IDF + 余弦相似度全库扫描，返回疑似重复的笔记组。
+
+### `suggest_consolidation`
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `workspace_id` | int | 否 | 工作区过滤 |
+
+基于知识图谱社区检测 + 相似度边 + 时间戳，返回知识整理建议（主题聚类/合并建议/陈旧笔记）。
 
 ---
 

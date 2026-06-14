@@ -283,6 +283,68 @@ def create_mcp_server(db_path: str = "memomind.db"):
         result = client.importer.import_json(json_content, strategy=strategy)
         return _to_json(result)
 
+    # ==================== Knowledge Graph ====================
+
+    @mcp.tool()
+    def get_knowledge_graph(
+        workspace_id: Optional[int] = None,
+        max_nodes: int = 100,
+    ) -> str:
+        """构建知识图谱，返回节点和边的关系网络。
+
+        返回包含 nodes（笔记节点，含标签/重要度/分组）和
+        edges（三种边：link链接/tag共享标签/similarity内容相似度）。
+        """
+        client = get_client()
+        graph = client._kg.build_graph(workspace_id=workspace_id, max_nodes=max_nodes)
+        stats = client._kg.get_graph_stats(graph)
+        return _to_json({"graph": graph, "stats": stats})
+
+    @mcp.tool()
+    def get_graph_stats(workspace_id: Optional[int] = None) -> str:
+        """获取知识图谱统计信息：节点数、边数、边类型分布、平均度、密度。"""
+        client = get_client()
+        graph = client._kg.build_graph(workspace_id=workspace_id)
+        return _to_json(client._kg.get_graph_stats(graph))
+
+    @mcp.tool()
+    def scan_duplicates(
+        workspace_id: Optional[int] = None,
+        threshold: float = 0.6,
+    ) -> str:
+        """扫描知识库中的疑似重复笔记。
+
+        使用 TF-IDF + 余弦相似度全库比对，超过阈值的笔记对
+        用并查集聚类分组。返回重复组列表，每组含相似度和共同标签。
+        """
+        client = get_client()
+        groups = client._semantic.scan_duplicates(
+            workspace_id=workspace_id, threshold=threshold)
+        # 序列化为 JSON 友好格式
+        result = []
+        for g in groups:
+            result.append({
+                'notes': [{'id': n.id, 'title': n.title, 'tags': n.tags,
+                           'updated_at': n.updated_at.isoformat() if n.updated_at else None}
+                          for n in g['notes']],
+                'max_similarity': g['max_similarity'],
+                'common_tags': g['common_tags'],
+            })
+        return _to_json({"duplicate_groups": result})
+
+    @mcp.tool()
+    def suggest_consolidation(workspace_id: Optional[int] = None) -> str:
+        """基于知识图谱分析给出知识整理建议。
+
+        返回三部分：
+        - topics: 主题聚类（社区检测结果）
+        - merge_suggestions: 高相似度笔记对，建议合并
+        - stale_candidates: 长期未更新的陈旧笔记
+        """
+        client = get_client()
+        suggestions = client._kg.suggest_consolidation(workspace_id=workspace_id)
+        return _to_json(suggestions)
+
     # ==================== Activity ====================
 
     @mcp.tool()

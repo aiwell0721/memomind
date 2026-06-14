@@ -253,29 +253,142 @@ class TestIndexManagement:
 
 class TestEdgeCases:
     """边界情况测试"""
-    
+
     def test_single_note_search(self, semantic):
         """测试只有一条笔记"""
         semantic.db.execute("""
             INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)
         """, ("测试笔记", "这是一条测试笔记", json.dumps(["测试"])))
         semantic.db.commit()
-        
+
         results = semantic.semantic_search("测试")
         assert len(results) == 1
-    
+
     def test_unicode_query(self, semantic, sample_notes):
         """测试 Unicode 查询"""
         results = semantic.semantic_search("🐍 Python")
         assert len(results) >= 0
-    
+
     def test_very_long_query(self, semantic, sample_notes):
         """测试超长查询"""
         long_query = "Python " * 100
         results = semantic.semantic_search(long_query)
         assert isinstance(results, list)
-    
+
     def test_special_characters_query(self, semantic, sample_notes):
         """测试特殊字符查询"""
         results = semantic.semantic_search("<>&\"' Python")
         assert isinstance(results, list)
+
+
+class TestScanDuplicates:
+    """去重扫描测试"""
+
+    def test_scan_finds_highly_similar_notes(self, db):
+        """测试发现高度相似笔记"""
+        # 插入两条几乎相同的笔记
+        db.execute("""
+            INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)
+        """, ("Python 装饰器详解", "Python 装饰器是一种语法糖，用于修改函数行为。常用装饰器包括 @staticmethod、@classmethod、@property 等。", json.dumps(["python", "编程"])))
+        db.execute("""
+            INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)
+        """, ("装饰器深入理解", "Python 装饰器是修改函数行为的语法糖。常见的有 @staticmethod、@classmethod、@property。还可以自定义装饰器实现权限校验。", json.dumps(["python", "进阶"])))
+        db.execute("""
+            INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)
+        """, ("Docker 入门", "Docker 是一个容器化平台，可以打包应用及其依赖。", json.dumps(["docker", "部署"])))
+        db.commit()
+
+        semantic = SemanticService(db)
+        groups = semantic.scan_duplicates(threshold=0.3)
+
+        # 前两条应该被分到一组
+        assert len(groups) > 0
+        # 找到包含装饰器笔记的组
+        dup_group = None
+        for g in groups:
+            titles = [n.title for n in g['notes']]
+            if 'Python 装饰器详解' in titles:
+                dup_group = g
+                break
+        assert dup_group is not None
+        assert len(dup_group['notes']) >= 2
+        assert dup_group['max_similarity'] > 0.3
+
+    def test_scan_empty_database(self, db):
+        """测试空数据库"""
+        semantic = SemanticService(db)
+        groups = semantic.scan_duplicates()
+        assert groups == []
+
+    def test_scan_no_duplicates(self, db):
+        """测试无重复情况"""
+        db.execute("""
+            INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)
+        """, ("量子力学导论", "量子力学研究微观粒子的运动规律。", json.dumps(["物理"])))
+        db.execute("""
+            INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)
+        """, ("明清小说赏析", "明清时期是中国古典小说的巅峰。", json.dumps(["文学"])))
+        db.commit()
+
+        semantic = SemanticService(db)
+        groups = semantic.scan_duplicates(threshold=0.1)
+        # 两条完全不相关的笔记不应被分组
+        assert groups == []
+
+    def test_scan_single_note(self, db):
+        """测试单条笔记"""
+        db.execute("""
+            INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)
+        """, ("唯一笔记", "这是唯一的一条笔记。", json.dumps(["测试"])))
+        db.commit()
+
+        semantic = SemanticService(db)
+        groups = semantic.scan_duplicates()
+        assert groups == []
+
+    def test_scan_respects_threshold(self, db):
+        """测试阈值过滤"""
+        # 插入中等相似度的笔记
+        db.execute("""
+            INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)
+        """, ("Git 基础", "Git 是分布式版本控制系统。常用命令 git add, git commit, git push。", json.dumps(["git", "版本控制"])))
+        db.execute("""
+            INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)
+        """, ("Git 工作流", "Git 工作流包括 feature branch、pull request、code review。", json.dumps(["git", "协作"])))
+        db.commit()
+
+        semantic = SemanticService(db)
+        # 高阈值不应匹配
+        high_groups = semantic.scan_duplicates(threshold=0.9)
+        assert high_groups == []
+        # 低阈值应匹配
+        low_groups = semantic.scan_duplicates(threshold=0.1)
+        assert len(low_groups) > 0
+
+    def test_scan_with_workspace_filter(self, db):
+        """测试工作区过滤"""
+        # 确保 workspace_id 列存在
+        try:
+            db.execute("ALTER TABLE notes ADD COLUMN workspace_id INTEGER DEFAULT 1")
+        except Exception:
+            pass
+        # workspace 1
+        db.execute("""
+            INSERT INTO notes (title, content, tags, workspace_id) VALUES (?, ?, ?, 1)
+        """, ("笔记A", "Python Flask Web 开发框架", json.dumps(["python"])))
+        db.execute("""
+            INSERT INTO notes (title, content, tags, workspace_id) VALUES (?, ?, ?, 1)
+        """, ("笔记B", "Flask Web 应用开发指南", json.dumps(["python"])))
+        # workspace 2（不应被扫描到）
+        db.execute("""
+            INSERT INTO notes (title, content, tags, workspace_id) VALUES (?, ?, ?, 2)
+        """, ("无关笔记", "完全不同的内容主题", json.dumps(["其他"])))
+        db.commit()
+
+        semantic = SemanticService(db)
+        groups = semantic.scan_duplicates(workspace_id=1, threshold=0.2)
+        # 只应扫描 workspace 1 的笔记
+        assert len(groups) > 0
+        for g in groups:
+            for n in g['notes']:
+                assert '无关笔记' not in n.title

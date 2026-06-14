@@ -382,3 +382,129 @@ class SemanticService:
             'unique_terms': len(self._idf_cache),
             'avg_idf': sum(self._idf_cache.values()) / len(self._idf_cache) if self._idf_cache else 0
         }
+
+    def scan_duplicates(
+        self,
+        workspace_id: Optional[int] = None,
+        threshold: float = 0.6,
+        limit: int = 50
+    ) -> List[Dict]:
+        """
+        全库扫描疑似重复的笔记组
+
+        策略：计算所有笔记的 TF-IDF 向量 → 两两比较余弦相似度 →
+              超过阈值的对用并查集分组 → 返回每组信息和共同标签
+
+        Args:
+            workspace_id: 工作区过滤（可选，None 表示扫描全部）
+            threshold: 相似度阈值（0-1，默认 0.6）
+            limit: 最多扫描的笔记数
+
+        Returns:
+            [{
+                'notes': [Note, ...],
+                'max_similarity': float,
+                'common_tags': [str, ...]
+            }, ...]
+        """
+        self._load_idf()
+
+        # 1. 获取笔记列表
+        has_workspace = self._has_column('notes', 'workspace_id')
+        if workspace_id is not None and has_workspace:
+            cursor = self.db.execute(
+                "SELECT id, title, content, tags, created_at, updated_at "
+                "FROM notes WHERE workspace_id = ? LIMIT ?",
+                (workspace_id, limit))
+        else:
+            cursor = self.db.execute(
+                "SELECT id, title, content, tags, created_at, updated_at "
+                "FROM notes LIMIT ?", (limit,))
+
+        notes = []
+        for row in cursor.fetchall():
+            notes.append(Note.from_row(row))
+
+        if len(notes) < 2:
+            return []
+
+        # 2. 一次性计算所有 TF-IDF 向量（避免重复计算）
+        vectors: Dict[int, Dict[str, float]] = {}
+        for note in notes:
+            text = self._extract_text(note.title, note.content, note.tags)
+            vec = self._compute_tfidf_vector(text)
+            if vec:
+                vectors[note.id] = vec
+
+        # 3. 两两比较，收集超过阈值的对
+        pairs: List[Tuple[int, int, float]] = []
+        for i in range(len(notes)):
+            for j in range(i + 1, len(notes)):
+                id1, id2 = notes[i].id, notes[j].id
+                v1, v2 = vectors.get(id1), vectors.get(id2)
+                if not v1 or not v2:
+                    continue
+                sim = self._cosine_similarity(v1, v2)
+                if sim >= threshold:
+                    pairs.append((id1, id2, sim))
+
+        if not pairs:
+            return []
+
+        # 4. 并查集分组
+        parent: Dict[int, int] = {}
+
+        def find(x: int) -> int:
+            if x not in parent:
+                parent[x] = x
+            if parent[x] != x:
+                parent[x] = find(parent[x])
+            return parent[x]
+
+        def union(x: int, y: int) -> None:
+            rx, ry = find(x), find(y)
+            if rx != ry:
+                parent[rx] = ry
+
+        pair_scores: Dict[Tuple[int, int], float] = {}
+        for id1, id2, sim in pairs:
+            union(id1, id2)
+            key = (min(id1, id2), max(id1, id2))
+            if key not in pair_scores or sim > pair_scores[key]:
+                pair_scores[key] = sim
+
+        # 5. 聚合组信息
+        groups_map: Dict[int, List[Note]] = {}
+        for note in notes:
+            root = find(note.id)
+            if root not in groups_map:
+                groups_map[root] = []
+            groups_map[root].append(note)
+
+        result = []
+        note_map = {n.id: n for n in notes}
+        for group_notes in groups_map.values():
+            if len(group_notes) < 2:
+                continue
+
+            # 计算组内最高相似度
+            max_sim = 0.0
+            for i in range(len(group_notes)):
+                for j in range(i + 1, len(group_notes)):
+                    key = (min(group_notes[i].id, group_notes[j].id),
+                           max(group_notes[i].id, group_notes[j].id))
+                    max_sim = max(max_sim, pair_scores.get(key, 0.0))
+
+            # 共同标签
+            tag_sets = [set(n.tags) for n in group_notes]
+            common_tags = list(tag_sets[0].intersection(*tag_sets[1:])) if len(tag_sets) > 1 else list(tag_sets[0])
+
+            result.append({
+                'notes': group_notes,
+                'max_similarity': round(max_sim, 4),
+                'common_tags': common_tags
+            })
+
+        # 按最高相似度降序排列
+        result.sort(key=lambda g: g['max_similarity'], reverse=True)
+        return result

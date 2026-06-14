@@ -108,7 +108,7 @@ class TestMCPServerCreation:
     def test_tool_count(self, temp_db_path):
         mcp = create_mcp_server(temp_db_path)
         tools = mcp._tool_manager.list_tools()
-        assert len(tools) == 20
+        assert len(tools) == 24
 
     def test_core_tools_exist(self, temp_db_path):
         mcp = create_mcp_server(temp_db_path)

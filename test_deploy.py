@@ -121,13 +121,13 @@ for a in activities[:5]:
     print(f'    - {action} | {detail}')
 
 print()
-print('11. 知识图谱')
-r = s.get(f'{BASE}/api/graph', params={'workspace_id': ws_id})
+print('11. 链接图谱')
+r = s.get(f'{BASE}/api/links/graph')
 print(f'    状态: {r.status_code}')
 graph = r.json()
-nc = graph.get('node_count', 0)
-ec = graph.get('edge_count', 0)
-print(f'    节点数: {nc}, 边数: {ec}')
+nodes = graph.get('nodes', [])
+links = graph.get('links', [])
+print(f'    节点数: {len(nodes)}, 边数: {len(links)}')
 
 print()
 print('12. 获取笔记详情')
