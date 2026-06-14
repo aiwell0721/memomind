@@ -126,7 +126,29 @@ class ErrorResponse(BaseModel):
 from jose import JWTError, jwt
 from jose.exceptions import ExpiredSignatureError
 
-SECRET_KEY = os.environ.get("MEMOMIND_SECRET_KEY", secrets.token_hex(32))
+
+def resolve_secret_key(env: Optional[dict] = None) -> str:
+    """读取 JWT 签名密钥。
+
+    若环境变量 MEMOMIND_SECRET_KEY 未设，回退到 secrets.token_hex(32) 自动生成，
+    同时发出 UserWarning——因为每次进程重启会换密钥，旧 token 集体失效。
+    生产环境必须显式设置环境变量。
+    """
+    import warnings
+    e = os.environ if env is None else env
+    key = e.get("MEMOMIND_SECRET_KEY")
+    if key:
+        return key
+    warnings.warn(
+        "MEMOMIND_SECRET_KEY 未设置，已自动生成随机密钥。"
+        "进程重启后所有已发 JWT 将立即失效，生产环境必须在 .env 或部署平台显式设置。",
+        UserWarning,
+        stacklevel=2,
+    )
+    return secrets.token_hex(32)
+
+
+SECRET_KEY = resolve_secret_key()
 TOKEN_EXPIRE_HOURS = int(os.environ.get("MEMOMIND_TOKEN_EXPIRE", 24))
 ALGORITHM = "HS256"
 
