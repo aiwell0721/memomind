@@ -42,3 +42,8 @@ logs/
 *.db-shm
 *.db-wal
 
+# Tool caches / local-only state
+.claude/
+.vite/
+web/test-results/
+
