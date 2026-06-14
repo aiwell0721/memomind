@@ -10,6 +10,8 @@ MemoMind 提供统一的 Python SDK，包含以下模块：
 - `VersionsAPI` - 版本历史管理
 - `ExportService` - 导出功能
 - `ImportService` - 导入功能
+- `KnowledgeGraphService` - 知识图谱（社区检测、GraphML导出）
+- `SemanticService` - 语义搜索、去重扫描
 
 ---
 
@@ -251,6 +253,41 @@ result = client.importer.import_json_file(
     filepath="./backup.json",
     conflict_policy="skip"
 )
+```
+
+---
+
+## 🧠 知识图谱与去重消化
+
+> 以下功能通过 MCP Server 暴露（24 个工具），SDK 内部属性 `_kg` / `_semantic` 可调用。
+
+### 构建知识图谱
+
+```python
+graph = client._kg.build_graph(workspace_id=1, max_nodes=100)
+# 返回: {'nodes': [...], 'edges': [...]}
+# 边类型: link(链接) / tag(共享标签) / similarity(内容相似度)
+```
+
+### 获取图谱统计
+
+```python
+stats = client._kg.get_graph_stats(graph)
+# 返回: {'node_count': N, 'edge_count': N, 'edge_types': {...}, ...}
+```
+
+### 扫描重复笔记
+
+```python
+groups = client._semantic.scan_duplicates(workspace_id=1, threshold=0.6)
+# 返回: [{'notes': [Note, ...], 'max_similarity': 0.87, 'common_tags': [...]}]
+```
+
+### 知识整理建议
+
+```python
+suggestions = client._kg.suggest_consolidation(workspace_id=1)
+# 返回: {'topics': [...], 'merge_suggestions': [...], 'stale_candidates': [...]}
 ```
 
 ---

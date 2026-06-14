@@ -286,6 +286,46 @@ result = client.importer.import_json_file(
 
 ---
 
+### 7. 知识图谱与去重
+
+#### 查看知识图谱
+
+```python
+# 构建知识图谱（节点 = 笔记，边 = 链接/标签/相似度）
+graph = client._kg.build_graph(workspace_id=1, max_nodes=100)
+
+# 图谱统计
+stats = client._kg.get_graph_stats(graph)
+# {'node_count': 50, 'edge_count': 120, 'edge_types': {...}, ...}
+```
+
+#### 扫描重复笔记
+
+```python
+# 全库扫描相似度 > 0.6 的笔记对，自动分组
+groups = client._semantic.scan_duplicates(workspace_id=1, threshold=0.6)
+# [{'notes': [Note, Note], 'max_similarity': 0.87, 'common_tags': ['python']}]
+```
+
+#### 知识整理建议
+
+```python
+# 基于图谱分析，获取主题聚类 + 合并建议 + 陈旧笔记
+suggestions = client._kg.suggest_consolidation(workspace_id=1)
+# {'topics': [...], 'merge_suggestions': [...], 'stale_candidates': [...]}
+```
+
+#### 通过 MCP（AI Agent 调用）
+
+MCP Server 提供 24 个工具，AI Agent 可自动调用：
+- `get_knowledge_graph` — 构建知识图谱
+- `scan_duplicates` — 扫描重复笔记
+- `suggest_consolidation` — 知识整理建议
+
+详见 [MCP 工具规范](../docs-project/04-detailed-design/03-MCP工具规范.md)
+
+---
+
 ## 🖥️ 命令行工具
 
 ### 基本用法
@@ -401,4 +441,4 @@ python cli.py import json ./backup.json
 
 ---
 
-*最后更新：2026-04-23*
+*最后更新：2026-06-14*
