@@ -27,5 +27,8 @@ dev = [
 openai = ["openai>=1.0.0"]
 anthropic = ["anthropic>=0.25.0"]
 
+[tool.setuptools]
+py-modules = ["memomind"]
+
 [tool.setuptools.packages.find]
 include = ["api*", "core*", "mcp_server*"]
