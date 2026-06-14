@@ -31,8 +31,11 @@ class Database:
         self.conn.row_factory = sqlite3.Row
         # 启用外键
         self.conn.execute("PRAGMA foreign_keys = ON")
-        # 启用 WAL 模式（更好的并发性能）
+        # 启用 WAL 模式（更好的并发读性能）
         self.conn.execute("PRAGMA journal_mode = WAL")
+        # 并发写时等待 5 秒再抛 'database is locked'。
+        # Python sqlite3 模块当前默认就是 5000，但显式声明使行为不依赖运行时默认。
+        self.conn.execute("PRAGMA busy_timeout = 5000")
     
     def _init_schema(self):
         """初始化数据库结构"""
