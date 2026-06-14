@@ -74,10 +74,16 @@ export default function Settings() {
   };
 
   const handleCreateUser = async () => {
-    if (!newUsername.trim()) return;
+    const username = newUsername.trim();
+    if (!username) return;
+    const password = window.prompt(`为用户 "${username}" 设置初始密码（至少 6 位）`)?.trim();
+    if (!password || password.length < 6) {
+      setError('已取消：密码不能为空且至少 6 位');
+      return;
+    }
     setLoading(true);
     try {
-      await api.createUser(newUsername.trim());
+      await api.createUser(username, password, username);
       setNewUsername('');
       api.users().then(setUsers);
     } catch (err: unknown) {
