@@ -90,8 +90,8 @@ make docker-shell
 git clone https://github.com/aiwell0721/memomind.git
 cd memomind
 
-# 安装依赖
-pip install -r requirements.txt
+# 安装项目（含依赖）
+pip install -e .
 
 # 启动 REST API
 python -c "from core.api_server import create_app; import uvicorn; uvicorn.run(create_app('memomind.db'), host='0.0.0.0', port=8000)"

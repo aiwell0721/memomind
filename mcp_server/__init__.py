@@ -25,11 +25,7 @@ from typing import List, Optional
 from pathlib import Path
 from datetime import datetime
 
-# Add workspace root to path for memomind package imports
-_workspace_root = str(Path(__file__).parent.parent.parent)
-sys.path.insert(0, _workspace_root)
-
-from memomind.api.client import MemoMind
+from api.client import MemoMind
 
 
 def _to_json(obj, **kwargs) -> str:

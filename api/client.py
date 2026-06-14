@@ -6,21 +6,21 @@ import os
 from pathlib import Path
 from typing import List, Optional, Dict
 
-from ..core.database import Database
-from ..core.search_service import SearchService
-from ..core.version_service import VersionService
-from ..core.tag_service import TagService
-from ..core.link_service import LinkService
-from ..core.export_service import ExportService
-from ..core.import_service import ImportService
-from ..core.workspace_service import WorkspaceService
-from ..core.user_service import UserService
-from ..core.rag_service import RAGService
-from ..core.summarization_service import SummarizationService
-from ..core.activity_service import ActivityService
-from ..core.knowledge_graph_service import KnowledgeGraphService
-from ..core.semantic_service import SemanticService
-from ..core.ai_provider import create_provider
+from core.database import Database
+from core.search_service import SearchService
+from core.version_service import VersionService
+from core.tag_service import TagService
+from core.link_service import LinkService
+from core.export_service import ExportService
+from core.import_service import ImportService
+from core.workspace_service import WorkspaceService
+from core.user_service import UserService
+from core.rag_service import RAGService
+from core.summarization_service import SummarizationService
+from core.activity_service import ActivityService
+from core.knowledge_graph_service import KnowledgeGraphService
+from core.semantic_service import SemanticService
+from core.ai_provider import create_provider
 
 
 class NotesAPI:
@@ -314,8 +314,8 @@ class MemoMind:
     MemoMind 主 API 类
     
     用法：
-        from memomind import MemoMind
-        
+        from api.client import MemoMind
+
         client = MemoMind(db_path="~/memomind.db")
         
         # 创建笔记

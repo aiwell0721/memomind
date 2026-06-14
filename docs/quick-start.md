@@ -10,13 +10,14 @@
 pip install memomind
 ```
 
-### 方式 2：从源码安装
+> 安装后导入：`from api.client import MemoMind`
+
+### 方式 2：本地开发安装
 
 ```bash
 git clone https://github.com/your-org/memomind.git
 cd memomind
-pip install -r requirements.txt
-pip install jieba
+pip install -e .
 ```
 
 ### 方式 3：Docker 部署
@@ -33,7 +34,7 @@ docker run -v ./data:/data memomind:latest
 ### 步骤 1：创建数据库
 
 ```python
-from memomind import MemoMind
+from api.client import MemoMind
 
 # 创建客户端（自动创建数据库）
 client = MemoMind(db_path="~/memomind.db")

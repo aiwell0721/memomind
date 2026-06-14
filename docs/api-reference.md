@@ -18,7 +18,7 @@ MemoMind 提供统一的 Python SDK，包含以下模块：
 ## 🚀 快速开始
 
 ```python
-from memomind import MemoMind
+from api.client import MemoMind
 
 # 初始化客户端
 client = MemoMind(db_path="~/memomind.db")

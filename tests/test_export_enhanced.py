@@ -11,10 +11,10 @@ import json
 from pathlib import Path
 
 import sys
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from memomind.core.database import Database
-from memomind.core.export_service import ExportService
+from core.database import Database
+from core.export_service import ExportService
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def temp_db():
     db = Database(db_path)
     
     # 初始化所有表
-    from memomind.core.link_service import LinkService
+    from core.link_service import LinkService
     LinkService(db)  # This creates the note_links table
     
     # 创建测试笔记

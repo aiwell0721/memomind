@@ -13,9 +13,9 @@ from pathlib import Path
 
 # Add workspace root to path for memomind package imports
 import sys
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from memomind.api.client import MemoMind
+from api.client import MemoMind
 from mcp_server import create_mcp_server
 
 

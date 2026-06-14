@@ -866,7 +866,7 @@ Retry-After: 60
 ### 12.1 Python SDK
 
 ```python
-from memomind import MemoMindClient
+from api.client import MemoMind
 
 # 初始化客户端
 client = MemoMindClient(
