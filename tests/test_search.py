@@ -130,10 +130,101 @@ class TestSearchService(unittest.TestCase):
     def test_bm25_ranking(self):
         """测试 BM25 排序"""
         results = self.search.search("设计")
-        
+
         self.assertGreater(len(results), 0)
         # 检查有分数（不严格要求递减，因为可能有并列）
         self.assertTrue(all(r.score > 0 for r in results))
+
+
+class TestChineseSearchRealistic(unittest.TestCase):
+    """真实场景中文搜索：用户输入的是无空格的连续中文。
+
+    上面 TestSearchService 的 setUp 在写入时手工插入了空格，绕开了 FTS5
+    对连续 CJK 字符的分词缺陷。本类不预切词，验证修复后的 jieba 写入分词
+    路径能让纯中文笔记被正确索引和检索。
+    """
+
+    def setUp(self):
+        self.db = Database(":memory:")
+        self.search = SearchService(self.db)
+        self._seed_realistic()
+
+    def tearDown(self):
+        self.db.close()
+
+    def _seed_realistic(self):
+        """插入无人工分词的真实中文笔记。"""
+        import json
+        notes = [
+            ("中文测试笔记", "这是包含中文字符的测试内容", ["测试"]),
+            ("MemoMind介绍", "MemoMind是一个团队知识管理系统", ["产品"]),
+            ("全文搜索功能", "基于SQLite FTS5实现的全文搜索功能", ["功能"]),
+            ("部署记录", "今天完成了生产环境的部署工作", ["运维"]),
+        ]
+        for title, content, tags in notes:
+            self.db.execute(
+                "INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                (title, content, json.dumps(tags))
+            )
+        self.db.commit()
+
+    def test_search_single_chinese_word(self):
+        """搜索 '测试' 应命中『中文测试笔记』。"""
+        results = self.search.search("测试")
+        titles = [r.note.title for r in results]
+        self.assertIn("中文测试笔记", titles)
+
+    def test_search_compound_chinese_word(self):
+        """搜索 '全文搜索' 应命中『全文搜索功能』。"""
+        results = self.search.search("全文搜索")
+        titles = [r.note.title for r in results]
+        self.assertIn("全文搜索功能", titles)
+
+    def test_search_chinese_in_title(self):
+        """搜索 '知识管理' 应命中 MemoMind 介绍。"""
+        results = self.search.search("知识管理")
+        titles = [r.note.title for r in results]
+        self.assertIn("MemoMind介绍", titles)
+
+    def test_search_after_update(self):
+        """更新笔记后旧词不再命中、新词命中——验证 UPDATE 路径同步索引。"""
+        import json
+        cursor = self.db.execute(
+            "INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+            ("可更新笔记", "原始内容关于天气", json.dumps([]))
+        )
+        note_id = cursor.lastrowid
+        self.db.commit()
+        # 同步到 FTS（修复后应由 Database 自动处理）
+        # 先确认能搜到原始内容
+        self.assertIn("可更新笔记", [r.note.title for r in self.search.search("天气")])
+
+        # 更新内容
+        self.db.execute(
+            "UPDATE notes SET content = ? WHERE id = ?",
+            ("更新后的内容讨论编程", note_id)
+        )
+        self.db.commit()
+
+        # 旧词不再命中
+        self.assertNotIn("可更新笔记", [r.note.title for r in self.search.search("天气")])
+        # 新词命中
+        self.assertIn("可更新笔记", [r.note.title for r in self.search.search("编程")])
+
+    def test_search_after_delete(self):
+        """删除笔记后不再命中——验证 DELETE 路径同步索引。"""
+        import json
+        cursor = self.db.execute(
+            "INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+            ("待删除笔记", "包含独特词汇紫罗兰", json.dumps([]))
+        )
+        note_id = cursor.lastrowid
+        self.db.commit()
+        self.assertIn("待删除笔记", [r.note.title for r in self.search.search("紫罗兰")])
+
+        self.db.execute("DELETE FROM notes WHERE id = ?", (note_id,))
+        self.db.commit()
+        self.assertEqual([], self.search.search("紫罗兰"))
 
 
 if __name__ == '__main__':

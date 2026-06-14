@@ -2,18 +2,21 @@
 MemoMind 数据库连接管理
 """
 
+import re
 import sqlite3
 from pathlib import Path
 from typing import Optional
 
+from .tokenizer import get_tokenizer
+
 
 class Database:
     """数据库连接管理"""
-    
+
     def __init__(self, db_path: str = ":memory:"):
         """
         初始化数据库连接
-        
+
         Args:
             db_path: 数据库文件路径，默认使用内存数据库
         """
@@ -59,42 +62,119 @@ class Database:
             )
         """)
         
-        # 创建触发器：INSERT 自动同步索引
-        cursor.execute("""
-            CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN
-                INSERT INTO notes_fts(rowid, title, content, tags)
-                VALUES (new.id, new.title, new.content, new.tags);
-            END
-        """)
-        
-        # 创建触发器：DELETE 自动同步索引
-        cursor.execute("""
-            CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes BEGIN
-                DELETE FROM notes_fts WHERE rowid = old.id;
-            END
-        """)
-        
-        # 创建触发器：UPDATE 自动同步索引
-        cursor.execute("""
-            CREATE TRIGGER IF NOT EXISTS notes_au AFTER UPDATE ON notes BEGIN
-                DELETE FROM notes_fts WHERE rowid = old.id;
-                INSERT INTO notes_fts(rowid, title, content, tags)
-                VALUES (new.id, new.title, new.content, new.tags);
-            END
-        """)
+        # FTS5 同步改为 Python 端处理（见 sync_note_to_fts），原因：
+        # SQLite 触发器无法调用 Python 端的 jieba 分词，导致连续中文文本
+        # 被 unicode61 当作单个 token，搜索时永远 0 命中。
+        # 兼容老数据库：若历史触发器存在则丢弃。
+        cursor.execute("DROP TRIGGER IF EXISTS notes_ai")
+        cursor.execute("DROP TRIGGER IF EXISTS notes_ad")
+        cursor.execute("DROP TRIGGER IF EXISTS notes_au")
         
         # 创建标签索引（加速标签过滤）
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_notes_tags ON notes(tags)
         """)
-        
+
         self.conn.commit()
     
+    # SQL 写操作的正则：只匹配 notes 主表（含可选 schema 前缀），排除 notes_fts、
+    # note_versions、note_tags、note_links 等同前缀表。\b 保证 'notes' 是完整词。
+    _RE_INSERT_NOTES = re.compile(r"^\s*INSERT\s+(?:OR\s+\w+\s+)?INTO\s+notes\b(?!_)", re.IGNORECASE)
+    _RE_UPDATE_NOTES = re.compile(r"^\s*UPDATE\s+notes\b(?!_)", re.IGNORECASE)
+    _RE_DELETE_NOTES = re.compile(r"^\s*DELETE\s+FROM\s+notes\b(?!_)", re.IGNORECASE)
+
     def execute(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:
-        """执行 SQL 语句"""
+        """执行 SQL 语句。
+
+        notes 主表的 INSERT/UPDATE/DELETE 之后，自动 jieba 分词刷新 FTS5。
+        其它表（含 notes_fts/note_versions/note_tags/note_links）不触发同步。
+        """
         cursor = self.conn.cursor()
         cursor.execute(sql, params)
+        self._sync_fts_if_notes_write(sql, cursor)
         return cursor
+
+    # ---------- FTS5 同步 ----------
+
+    def _sync_fts_if_notes_write(self, sql: str, cursor: sqlite3.Cursor) -> None:
+        """SQL 是 notes 主表的写操作时刷新 FTS5。"""
+        if self._RE_INSERT_NOTES.match(sql):
+            note_id = cursor.lastrowid
+            if note_id:
+                row = self.conn.execute(
+                    "SELECT title, content, tags FROM notes WHERE id = ?",
+                    (note_id,)
+                ).fetchone()
+                if row:
+                    self._fts_upsert(note_id, row[0], row[1], row[2])
+        elif self._RE_UPDATE_NOTES.match(sql) or self._RE_DELETE_NOTES.match(sql):
+            # SQLite 不返回 UPDATE/DELETE 受影响行的 id 列表。
+            # 折中：刷新整张 FTS 表。当前 notes 量级（个人/小团队知识库）可接受；
+            # 若 notes 上万行可改为：UPDATE/DELETE 前先按 WHERE 查 id 列表再增量刷。
+            self._fts_rebuild_all()
+
+    def _fts_rebuild_all(self) -> None:
+        """重建整张 notes_fts。"""
+        self.conn.execute("DELETE FROM notes_fts")
+        rows = self.conn.execute(
+            "SELECT id, title, content, tags FROM notes"
+        ).fetchall()
+        for r in rows:
+            self._fts_upsert(r[0], r[1], r[2], r[3])
+
+    def _tokenize_for_fts(self, text: Optional[str]) -> str:
+        """对文本做 jieba 分词，返回空格分隔的 token 串供 FTS5 索引。"""
+        if not text:
+            return ""
+        tokens = get_tokenizer().tokenize(text, remove_stopwords=False)
+        return " ".join(tokens)
+
+    def _fts_upsert(
+        self,
+        note_id: int,
+        title: Optional[str],
+        content: Optional[str],
+        tags: Optional[str],
+    ) -> None:
+        tok_title = self._tokenize_for_fts(title)
+        tok_content = self._tokenize_for_fts(content)
+        self.conn.execute("DELETE FROM notes_fts WHERE rowid = ?", (note_id,))
+        self.conn.execute(
+            "INSERT INTO notes_fts(rowid, title, content, tags) VALUES (?, ?, ?, ?)",
+            (note_id, tok_title, tok_content, tags or "")
+        )
+
+    def _fts_delete(self, note_id: int) -> None:
+        self.conn.execute("DELETE FROM notes_fts WHERE rowid = ?", (note_id,))
+
+    # 公开 API（供 api_server / 历史调用方使用）
+    def sync_note_to_fts(
+        self,
+        note_id: int,
+        title: Optional[str],
+        content: Optional[str],
+        tags: Optional[str],
+    ) -> None:
+        """显式同步单条笔记到 FTS5。一般无需调用——execute() 已自动处理。"""
+        self._fts_upsert(note_id, title, content, tags)
+
+    def delete_note_from_fts(self, note_id: int) -> None:
+        """显式从 FTS5 删除单条笔记。一般无需调用——execute() 已自动处理。"""
+        self._fts_delete(note_id)
+
+    def reindex_notes(self) -> int:
+        """重建全部笔记的 FTS5 索引，返回处理条数。
+
+        启动时调用一次可修复历史数据（之前由旧触发器写入的未分词内容）。
+        """
+        self.conn.execute("DELETE FROM notes_fts")
+        rows = self.conn.execute(
+            "SELECT id, title, content, tags FROM notes"
+        ).fetchall()
+        for row in rows:
+            self._fts_upsert(row[0], row[1], row[2], row[3])
+        self.conn.commit()
+        return len(rows)
     
     def commit(self):
         """提交事务"""

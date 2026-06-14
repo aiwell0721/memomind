@@ -97,25 +97,21 @@ class SearchService:
     def _build_fts_query(self, query: str) -> str:
         """
         构建 FTS5 查询语句
-        
+
         FTS5 支持：
         - 精确短语："exact phrase"
         - AND 逻辑：term1 term2（默认）
         - OR 逻辑：term1 OR term2
         - 前缀匹配：term*
-        
-        支持中文分词（jieba）
+
+        支持中文分词（jieba）。
+
+        注：历史代码曾尝试用 '\\' 转义 FTS5 特殊字符，但 FTS5 不识别反斜杠转义，
+        反而把反斜杠当字面量塞进查询，破坏 jieba 后续分词。tokenize_for_search
+        会自己处理英文字符的引号包裹，这里直接交给它即可。
         """
-        # 转义特殊字符
-        special_chars = ['"', '*', '(', ')', '+', '-', '~']
-        for char in special_chars:
-            query = query.replace(char, '\\' + char)
-        
-        # 使用 jieba 分词
         tokenizer = get_tokenizer()
-        fts_query = tokenizer.tokenize_for_search(query)
-        
-        return fts_query
+        return tokenizer.tokenize_for_search(query)
     
     def _highlight(self, note: Note, query: str) -> dict:
         """

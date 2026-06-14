@@ -268,7 +268,16 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
     
     # 数据库连接（应用级）
     db = Database(db_path)
-    
+
+    # 历史数据回填：旧版本由 SQLite 触发器写入未分词的 FTS5 索引，
+    # 启动时一次性按 jieba 分词重建，确保中文搜索可用。
+    try:
+        reindexed = db.reindex_notes()
+        if reindexed:
+            print(f"Reindexed {reindexed} notes to FTS5")
+    except Exception as e:
+        print(f"Reindex notes warning: {e}")
+
     # 初始化服务
     search = SearchService(db)
     versions = VersionService(db)
