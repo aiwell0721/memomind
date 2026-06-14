@@ -2,7 +2,7 @@
 
 ## 📖 概述
 
-MemoMind 提供完整的命令行工具，支持所有核心功能。
+MemoMind 提供完整的命令行工具和 Python SDK，支持所有核心功能。
 
 ```bash
 # 基本用法
@@ -10,6 +10,13 @@ python cli.py [命令] [子命令] [参数]
 
 # 指定数据库
 python cli.py --db ~/memomind.db [命令]
+```
+
+**Python SDK 导入**（推荐通过命名空间入口）:
+
+```python
+from memomind import MemoMind  # 推荐
+# 或直接导入: from api.client import MemoMind  # 向后兼容
 ```
 
 ---
