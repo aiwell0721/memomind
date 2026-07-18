@@ -132,7 +132,7 @@ export default function Settings() {
     else if (activeTab === 'users') api.users().then(setUsers).catch(() => {});
     else if (activeTab === 'backups') api.backups(50).then(setBackups).catch(() => {});
     else if (activeTab === 'ai') {
-      api.getAiConfig(aiProvider).then((cfg) => {
+      api.getAiConfig().then((cfg) => {
         setAiConfig(cfg);
         setAiProvider(cfg.provider);
         setAiModel(cfg.model);

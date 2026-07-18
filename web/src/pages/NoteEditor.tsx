@@ -73,6 +73,10 @@ export default function NoteEditor() {
   const [remoteEdit, setRemoteEdit] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('preview');
   const [syntaxSearch, setSyntaxSearch] = useState('');
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [aiTags, setAiTags] = useState<string[] | null>(null);
+  const [aiTagsLoading, setAiTagsLoading] = useState(false);
 
   const wsRef = useRef<ReturnType<typeof createWsClient> | null>(null);
   const isLocalEdit = useRef(false);
@@ -404,22 +408,72 @@ export default function NoteEditor() {
         </>
       )}
 
-      {/* ═══ View Mode Toggle + Syntax Panel ═══ */}
+      {/* ═══ View Mode Toggle + AI Actions + Syntax Panel ═══ */}
       {!editMode && (
         <div className="flex items-center justify-between" style={{ marginBottom: '0.75rem', flexWrap: 'wrap', gap: 8 }}>
-          <div className="view-toggle">
-            <button className={`view-toggle-btn ${viewMode === 'preview' ? 'active' : ''}`} onClick={() => setViewMode('preview')}>
+          <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
+            <div className="view-toggle">
+              <button className={`view-toggle-btn ${viewMode === 'preview' ? 'active' : ''}`} onClick={() => setViewMode('preview')}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ marginRight: 4 }}>
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                预览
+              </button>
+              <button className={`view-toggle-btn ${viewMode === 'raw' ? 'active' : ''}`} onClick={() => setViewMode('raw')}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ marginRight: 4 }}>
+                  <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+                </svg>
+                RAW
+              </button>
+            </div>
+
+            {/* AI 操作按钮 */}
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ fontSize: 12, color: 'var(--accent)' }}
+              onClick={async () => {
+                if (!note) return;
+                setAiSummaryLoading(true); setAiSummary(null);
+                try {
+                  const res = await api.summarizeNote(note.id);
+                  setAiSummary(res.summary);
+                } catch (err) {
+                  toast(err instanceof Error ? err.message : '摘要生成失败', 'error');
+                } finally { setAiSummaryLoading(false); }
+              }}
+              disabled={aiSummaryLoading}
+              title="AI 生成摘要"
+            >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ marginRight: 4 }}>
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                <circle cx="12" cy="12" r="3" />
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
               </svg>
-              预览
+              {aiSummaryLoading ? '生成中...' : 'AI 摘要'}
             </button>
-            <button className={`view-toggle-btn ${viewMode === 'raw' ? 'active' : ''}`} onClick={() => setViewMode('raw')}>
+
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ fontSize: 12, color: 'var(--success)' }}
+              onClick={async () => {
+                if (!note) return;
+                setAiTagsLoading(true); setAiTags(null);
+                try {
+                  const res = await api.autoTagNote(note.id);
+                  setAiTags(res.tags);
+                  toast(`AI 推荐标签: ${res.tags.join(', ')}`);
+                } catch (err) {
+                  toast(err instanceof Error ? err.message : '自动标签失败', 'error');
+                } finally { setAiTagsLoading(false); }
+              }}
+              disabled={aiTagsLoading}
+              title="AI 自动推荐标签"
+            >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ marginRight: 4 }}>
-                <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                <line x1="7" y1="7" x2="7.01" y2="7" />
               </svg>
-              RAW
+              {aiTagsLoading ? '分析中...' : '自动标签'}
             </button>
           </div>
 
@@ -486,6 +540,63 @@ export default function NoteEditor() {
         <div className="card markdown-content" style={{ padding: '1.5rem 2rem' }}
           dangerouslySetInnerHTML={{ __html: marked(note.content || '_暂无内容_') }}
         />
+      )}
+
+      {/* ═══ AI 摘要结果 ═══ */}
+      {aiSummary && (
+        <div className="card animate-slide-up" style={{ marginTop: '1rem', padding: '1.25rem 1.5rem', borderLeft: '3px solid var(--accent)' }}>
+          <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>AI 摘要</span>
+            <button
+              className="btn-icon"
+              style={{ marginLeft: 'auto', width: 20, height: 20 }}
+              onClick={() => setAiSummary(null)}
+              title="收起"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <p style={{ fontSize: '0.9375rem', lineHeight: 1.75, color: 'var(--apple-text)', margin: 0, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+            {aiSummary}
+          </p>
+        </div>
+      )}
+
+      {/* ═══ AI 推荐标签结果 ═══ */}
+      {aiTags && aiTags.length > 0 && (
+        <div className="card animate-slide-up" style={{ marginTop: '1rem', padding: '1rem 1.5rem', borderLeft: '3px solid var(--success)' }}>
+          <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth="2" strokeLinecap="round">
+              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+              <line x1="7" y1="7" x2="7.01" y2="7" />
+            </svg>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>AI 推荐标签</span>
+            <button
+              className="btn-icon"
+              style={{ marginLeft: 'auto', width: 20, height: 20 }}
+              onClick={() => setAiTags(null)}
+              title="收起"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
+            {aiTags.map((tag, i) => (
+              <span key={i} className="tag">
+                <span className="tag-dot" style={{ background: ['#0071e3','#30b158','#f09824','#ee4b40'][i % 4] }} />
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* ═══ Incoming Links ═══ */}

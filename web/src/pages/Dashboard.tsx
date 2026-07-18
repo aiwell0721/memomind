@@ -11,6 +11,7 @@ import type { Workspace, Tag } from '../lib/api';
 const navItems = [
   { path: '/', icon: 'note', label: '笔记' },
   { path: '/tags', icon: 'tag', label: '标签' },
+  { path: '/ai', icon: 'ai', label: 'AI 问答' },
   { path: '/activity', icon: 'activity', label: '活动日志' },
   { path: '/settings', icon: 'settings', label: '设置' },
 ];
@@ -35,6 +36,15 @@ const icons: Record<string, React.ReactNode> = {
   activity: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+    </svg>
+  ),
+  ai: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-4 4 4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z" />
+      <path d="M12 14v2" />
+      <path d="M12 18a6 6 0 0 0 6-6h2a8 8 0 0 1-16 0h2a6 6 0 0 0 6 6z" />
+      <line x1="8.5" y1="3.5" x2="15.5" y2="10.5" />
+      <line x1="15.5" y1="3.5" x2="8.5" y2="10.5" />
     </svg>
   ),
   settings: (

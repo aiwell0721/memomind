@@ -7,6 +7,7 @@ import NoteEditor from './pages/NoteEditor';
 import Tags from './pages/Tags';
 import Activity from './pages/Activity';
 import Settings from './pages/Settings';
+import AiChat from './pages/AiChat';
 import { api } from './lib/api';
 
 /* ═══════════════════════════════════════════
@@ -63,6 +64,7 @@ function AnimatedRoutes() {
           <Route path="tags" element={<Tags />} />
           <Route path="activity" element={<Activity />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="ai" element={<AiChat />} />
         </Route>
       </Routes>
     </div>

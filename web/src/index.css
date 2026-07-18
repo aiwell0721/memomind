@@ -573,6 +573,8 @@ textarea.input {
 .markdown-content {
   line-height: 1.75;
   font-size: 0.9375rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .markdown-content h1 { margin: 1.5rem 0 0.75rem; }
 .markdown-content h2 { margin: 1.25rem 0 0.5rem; }

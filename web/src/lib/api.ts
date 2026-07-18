@@ -138,6 +138,22 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(cfg),
     }),
+
+  // AI Features
+  ask: (question: string, workspace_id?: number) =>
+    request<{ answer: string; sources: string[]; confidence: number }>('/ask', {
+      method: 'POST',
+      body: JSON.stringify({ question, workspace_id, max_sources: 5 }),
+    }),
+  summarizeNote: (noteId: number, max_length = 300) =>
+    request<{ note_id: number; summary: string }>(`/notes/${noteId}/summarize`, {
+      method: 'POST',
+      body: JSON.stringify({ max_length, method: 'abstractive' }),
+    }),
+  autoTagNote: (noteId: number) =>
+    request<{ note_id: number; tags: string[] }>(`/tags/auto/${noteId}`, {
+      method: 'POST',
+    }),
 };
 
 // Types
