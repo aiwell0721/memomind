@@ -1,8 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../App';
 import { api } from '../lib/api';
 import type { Workspace, Tag } from '../lib/api';
+
+/* ═══════════════════════════════════════════
+   Navigation Items
+   ═══════════════════════════════════════════ */
 
 const navItems = [
   { path: '/', icon: 'note', label: '笔记' },
@@ -11,6 +15,7 @@ const navItems = [
   { path: '/settings', icon: 'settings', label: '设置' },
 ];
 
+/* ── SVG Icons ── */
 const icons: Record<string, React.ReactNode> = {
   note: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -38,25 +43,185 @@ const icons: Record<string, React.ReactNode> = {
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
     </svg>
   ),
-};
-
-function SidebarChevron({ open }: { open: boolean }) {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
-    >
+  chevron: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="15 18 9 12 15 6" />
     </svg>
+  ),
+  plus: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  ),
+  logout: (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  ),
+  search: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  ),
+};
+
+/* ═══════════════════════════════════════════
+   Workspace Dropdown (custom, not native)
+   ═══════════════════════════════════════════ */
+
+function WorkspaceDropdown({
+  workspaces, selected, onChange,
+}: {
+  workspaces: Workspace[];
+  selected: number | null;
+  onChange: (id: number | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const selectedWs = workspaces.find((w) => w.id === selected);
+  const filtered = workspaces.filter((w) =>
+    w.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div ref={ref} style={{ position: 'relative', width: '100%' }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 8, padding: '6px 10px', borderRadius: 'var(--radius-sm)',
+          border: '0.5px solid var(--apple-border)', background: 'var(--apple-surface)',
+          fontSize: 12, fontWeight: 500, color: 'var(--apple-text)',
+          cursor: 'pointer', fontFamily: 'inherit',
+          transition: 'all 0.15s var(--ease-smooth)',
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selectedWs ? (
+            <span className="flex items-center gap-2">
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+              {selectedWs.name}
+            </span>
+          ) : (
+            <span style={{ color: 'var(--apple-text-secondary)' }}>全部工作区</span>
+          )}
+        </span>
+        <span style={{
+          transform: open ? 'rotate(180deg)' : 'none',
+          transition: 'transform 0.2s var(--ease-smooth)',
+          color: 'var(--apple-text-tertiary)',
+          display: 'flex',
+        }}>
+          {icons.chevron}
+        </span>
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50,
+          background: 'var(--apple-surface)', borderRadius: 'var(--radius-md)',
+          boxShadow: 'var(--shadow-lg)', border: '0.5px solid var(--apple-border-light)',
+          overflow: 'hidden', animation: 'scaleIn 0.15s var(--ease-spring)',
+        }}>
+          {/* Search */}
+          <div style={{ padding: '6px 8px', borderBottom: '0.5px solid var(--apple-border-light)' }}>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', opacity: 0.35, display: 'flex' }}>
+                {icons.search}
+              </span>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="搜索工作区..."
+                style={{
+                  width: '100%', padding: '4px 8px 4px 28px', fontSize: 12,
+                  border: 'none', borderRadius: 6, background: 'var(--apple-bg)',
+                  color: 'var(--apple-text)', outline: 'none', fontFamily: 'inherit',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* List */}
+          <div style={{ maxHeight: 180, overflowY: 'auto', padding: '4px 0' }}>
+            <button
+              onClick={() => { onChange(null); setOpen(false); }}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                padding: '6px 10px', border: 'none', background: !selected ? 'var(--accent-light)' : 'transparent',
+                color: !selected ? 'var(--accent)' : 'var(--apple-text-secondary)',
+                fontSize: 12, fontWeight: !selected ? 600 : 400, cursor: 'pointer',
+                fontFamily: 'inherit', textAlign: 'left',
+              }}
+            >
+              全部工作区
+            </button>
+            {filtered.map((ws) => (
+              <button
+                key={ws.id}
+                onClick={() => { onChange(ws.id); setOpen(false); }}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '6px 10px', border: 'none',
+                  background: selected === ws.id ? 'var(--accent-light)' : 'transparent',
+                  color: selected === ws.id ? 'var(--accent)' : 'var(--apple-text)',
+                  fontSize: 12, fontWeight: selected === ws.id ? 600 : 400,
+                  cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+                {ws.name}
+                {ws.note_count !== undefined && (
+                  <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--apple-text-tertiary)' }}>
+                    {ws.note_count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
+
+/* ═══════════════════════════════════════════
+   Color dot palette for tags
+   ═══════════════════════════════════════════ */
+
+const dotColors = [
+  '#0071e3', '#30b158', '#f09824', '#ee4b40',
+  '#ac4ee0', '#ff69b4', '#00b8b0', '#ff9500',
+];
+
+function TagDot({ index }: { index: number }) {
+  return (
+    <span style={{
+      width: 7, height: 7, borderRadius: '50%',
+      background: dotColors[index % dotColors.length],
+      flexShrink: 0,
+    }} />
+  );
+}
+
+/* ═══════════════════════════════════════════
+   Main Dashboard Component
+   ═══════════════════════════════════════════ */
 
 export default function Dashboard() {
   const { username, logout } = useAuth();
@@ -79,142 +244,135 @@ export default function Dashboard() {
     window.dispatchEvent(new CustomEvent('workspace-change', { detail: id }));
   };
 
+  // Flatten tag tree for display
+  const flatTags = (tagList: Tag[]): Tag[] =>
+    tagList.flatMap((t) => [t, ...flatTags(t.children || [])]);
+
+  const allTags = flatTags(tags);
+
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--apple-bg)' }}>
-      {/* Sidebar */}
+      {/* ═══ Sidebar (glass morphism) ═══ */}
       <aside
-        className="flex flex-col transition-all duration-300 ease-in-out"
-        style={{
-          width: sidebarOpen ? 240 : 56,
-          background: 'var(--apple-sidebar)',
-          borderRight: '0.5px solid var(--apple-border-light)',
-        }}
+        className="sidebar flex flex-col transition-all duration-300 ease-in-out"
+        style={{ width: sidebarOpen ? 248 : 56 }}
       >
-        {/* Logo */}
+        {/* ── Logo Bar ── */}
         <div
-          className="flex items-center justify-between px-3 py-3"
-          style={{ borderBottom: '0.5px solid var(--apple-border-light)' }}
+          className="flex items-center justify-between"
+          style={{
+            padding: sidebarOpen ? '0.625rem 0.75rem' : '0.625rem 0.5rem',
+            borderBottom: '0.5px solid var(--apple-border-light)',
+            minHeight: 48,
+          }}
         >
-          {sidebarOpen && (
-            <div className="flex items-center gap-2">
-              <span style={{ fontSize: 20 }}>🧠</span>
-              <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.02em' }}>
+          {sidebarOpen ? (
+            <div className="flex items-center gap-2" style={{ minWidth: 0 }}>
+              <span style={{ fontSize: 20, flexShrink: 0 }}>
+                <svg width="22" height="22" viewBox="0 0 56 56" fill="none">
+                  <defs>
+                    <linearGradient id="sbGrad" x1="0" y1="0" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#0071e3" /><stop offset="1" stopColor="#40a4ff" />
+                    </linearGradient>
+                  </defs>
+                  <rect x="4" y="8" width="38" height="44" rx="6" stroke="url(#sbGrad)" strokeWidth="3" fill="none" />
+                  <line x1="14" y1="22" x2="32" y2="22" stroke="url(#sbGrad)" strokeWidth="2.5" strokeLinecap="round" />
+                  <line x1="14" y1="30" x2="32" y2="30" stroke="url(#sbGrad)" strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+              </span>
+              <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
                 MemoMind
               </span>
               {health && (
-                <span
-                  style={{
-                    fontSize: 10,
-                    background: 'rgba(0,0,0,0.06)',
-                    padding: '1px 5px',
-                    borderRadius: 6,
-                    color: 'var(--apple-text-secondary)',
-                    fontWeight: 500,
-                  }}
-                >
+                <span style={{
+                  fontSize: 10, background: 'rgba(0,0,0,0.06)', padding: '1px 6px',
+                  borderRadius: 6, color: 'var(--apple-text-secondary)', fontWeight: 500,
+                  flexShrink: 0,
+                }}>
                   v{health.version}
                 </span>
               )}
             </div>
+          ) : (
+            <span style={{ fontSize: 20, margin: '0 auto' }}>
+              <svg width="22" height="22" viewBox="0 0 56 56" fill="none">
+                <defs>
+                  <linearGradient id="sbGrad2" x1="0" y1="0" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+                    <stop stopColor="#0071e3" /><stop offset="1" stopColor="#40a4ff" />
+                  </linearGradient>
+                </defs>
+                <rect x="4" y="8" width="38" height="44" rx="6" stroke="url(#sbGrad2)" strokeWidth="3" fill="none" />
+                <line x1="14" y1="22" x2="32" y2="22" stroke="url(#sbGrad2)" strokeWidth="2.5" strokeLinecap="round" />
+                <line x1="14" y1="30" x2="32" y2="30" stroke="url(#sbGrad2)" strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+            </span>
           )}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            style={{
-              width: 28,
-              height: 28,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 6,
-              border: 'none',
-              background: 'transparent',
-              cursor: 'pointer',
-              color: 'var(--apple-text-secondary)',
-              transition: 'background 0.15s',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0,0,0,0.05)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+            className="btn-icon"
+            style={{ width: 28, height: 28, flexShrink: 0 }}
+            title={sidebarOpen ? '收起侧边栏' : '展开侧边栏'}
           >
-            <SidebarChevron open={sidebarOpen} />
+            <span style={{
+              transform: sidebarOpen ? 'rotate(180deg)' : 'none',
+              transition: 'transform 0.2s var(--ease-smooth)',
+              display: 'flex',
+            }}>
+              {icons.chevron}
+            </span>
           </button>
         </div>
 
-        {/* Workspace selector */}
+        {/* ── Workspace Selector ── */}
         {sidebarOpen && workspaces.length > 0 && (
-          <div className="px-3 py-2" style={{ borderBottom: '0.5px solid var(--apple-border-light)' }}>
-            <div className="section-label">工作区</div>
-            <select
-              value={selectedWorkspace ?? ''}
-              onChange={(e) =>
-                handleWorkspaceChange(e.target.value ? Number(e.target.value) : null)
-              }
-              style={{
-                width: '100%',
-                marginTop: 4,
-                background: 'var(--apple-surface)',
-                border: '0.5px solid var(--apple-border)',
-                borderRadius: 8,
-                padding: '4px 8px',
-                fontSize: 12,
-                color: 'var(--apple-text)',
-                outline: 'none',
-                fontFamily: 'inherit',
-              }}
-            >
-              <option value="">全部工作区</option>
-              {workspaces.map((ws) => (
-                <option key={ws.id} value={ws.id}>
-                  {ws.name}
-                </option>
-              ))}
-            </select>
+          <div style={{ padding: '0.625rem 0.75rem', borderBottom: '0.5px solid var(--apple-border-light)' }}>
+            <div className="sidebar-section-label">工作区</div>
+            <div style={{ marginTop: 4 }}>
+              <WorkspaceDropdown
+                workspaces={workspaces}
+                selected={selectedWorkspace}
+                onChange={handleWorkspaceChange}
+              />
+            </div>
           </div>
         )}
 
-        {/* Navigation */}
-        <nav className="flex-1 px-2 py-2 space-y-0.5">
-          {sidebarOpen && <div className="section-label">导航</div>}
-          {navItems.map((item) => (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className="sidebar-item"
-              style={{
-                background:
-                  location.pathname === item.path
-                    ? 'var(--accent-light)'
-                    : 'transparent',
-                color:
-                  location.pathname === item.path
-                    ? 'var(--accent)'
-                    : 'var(--apple-text)',
-                fontWeight: location.pathname === item.path ? 600 : 500,
-                animation: sidebarOpen ? 'none' : 'none',
-              }}
-            >
-              <span style={{ opacity: 0.75 }}>{icons[item.icon]}</span>
-              {sidebarOpen && <span>{item.label}</span>}
-            </button>
-          ))}
+        {/* ── Nav ── */}
+        <nav className="flex-1" style={{ padding: '0.5rem', overflowY: 'auto' }}>
+          {sidebarOpen && <div className="sidebar-section-label">导航</div>}
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <button
+                key={item.path}
+                onClick={() => navigate(item.path)}
+                className={`sidebar-item ${isActive ? 'active' : ''}`}
+                title={!sidebarOpen ? item.label : undefined}
+                style={{ justifyContent: sidebarOpen ? 'flex-start' : 'center' }}
+              >
+                <span style={{ opacity: isActive ? 1 : 0.6, display: 'flex', flexShrink: 0 }}>
+                  {icons[item.icon]}
+                </span>
+                {sidebarOpen && <span>{item.label}</span>}
+              </button>
+            );
+          })}
         </nav>
 
-        {/* Tags */}
-        {sidebarOpen && tags.length > 0 && (
-          <div className="px-3 py-2" style={{ borderTop: '0.5px solid var(--apple-border-light)' }}>
-            <div className="section-label">标签</div>
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              {tags.slice(0, 10).map((tag) => (
+        {/* ── Tags (compact sidebar list) ── */}
+        {sidebarOpen && allTags.length > 0 && (
+          <div style={{ padding: '0.5rem 0.75rem', borderTop: '0.5px solid var(--apple-border-light)' }}>
+            <div className="sidebar-section-label">标签</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6, maxHeight: 120, overflowY: 'auto' }}>
+              {allTags.slice(0, 15).map((tag, i) => (
                 <span
                   key={tag.id}
                   onClick={() => navigate(`/?tag=${tag.name}`)}
                   style={{
-                    padding: '2px 8px',
-                    background: 'rgba(0,0,0,0.04)',
-                    borderRadius: 6,
-                    fontSize: 11,
-                    color: 'var(--apple-text-secondary)',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s',
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '3px 8px', borderRadius: 6, fontSize: 11,
+                    background: 'rgba(0,0,0,0.04)', color: 'var(--apple-text-secondary)',
+                    cursor: 'pointer', transition: 'all 0.15s',
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.background = 'rgba(0,0,0,0.08)';
@@ -225,6 +383,7 @@ export default function Dashboard() {
                     e.currentTarget.style.color = 'var(--apple-text-secondary)';
                   }}
                 >
+                  <TagDot index={i} />
                   {tag.name}
                 </span>
               ))}
@@ -232,33 +391,37 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* User */}
+        {/* ── User Footer ── */}
         <div
-          className="flex items-center justify-between px-3 py-2.5"
-          style={{ borderTop: '0.5px solid var(--apple-border-light)' }}
+          className="flex items-center justify-between"
+          style={{
+            padding: sidebarOpen ? '0.5rem 0.75rem' : '0.5rem',
+            borderTop: '0.5px solid var(--apple-border-light)',
+            minHeight: 44,
+          }}
         >
           {sidebarOpen && (
-            <span style={{ fontSize: 12, color: 'var(--apple-text-secondary)', fontWeight: 500 }}>
-              {username}
-            </span>
+            <div className="flex items-center gap-2" style={{ minWidth: 0 }}>
+              {/* Avatar */}
+              <div style={{
+                width: 26, height: 26, borderRadius: '50%',
+                background: 'linear-gradient(135deg, var(--accent), #40a4ff)',
+                color: 'white', fontSize: 11, fontWeight: 600,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                {username?.charAt(0).toUpperCase()}
+              </div>
+              <span style={{ fontSize: 12, color: 'var(--apple-text-secondary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {username}
+              </span>
+            </div>
           )}
           <button
             onClick={logout}
             title="退出登录"
-            style={{
-              width: 28,
-              height: 28,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 6,
-              border: 'none',
-              background: 'transparent',
-              cursor: 'pointer',
-              color: 'var(--apple-text-tertiary)',
-              transition: 'all 0.15s',
-              fontSize: 16,
-            }}
+            className="btn-icon"
+            style={{ width: 28, height: 28, flexShrink: 0, marginLeft: sidebarOpen ? 0 : 'auto', marginRight: sidebarOpen ? 0 : 'auto' }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'var(--danger-bg)';
               e.currentTarget.style.color = 'var(--danger)';
@@ -268,17 +431,13 @@ export default function Dashboard() {
               e.currentTarget.style.color = 'var(--apple-text-tertiary)';
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
+            {icons.logout}
           </button>
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-auto">
+      {/* ═══ Main Content ═══ */}
+      <main className="flex-1 overflow-auto" style={{ position: 'relative', paddingTop: '2rem' }}>
         <Outlet />
       </main>
     </div>

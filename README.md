@@ -111,9 +111,9 @@ cd web
 # 安装依赖（首次）
 npm install
 
-# 开发模式（自动代理到后端）
+# 开发模式（自动代理到后端 API）
 npm run dev
-# 访问 http://localhost:3000
+# 访问 http://localhost:5173
 
 # 生产构建
 npm run build
@@ -121,15 +121,15 @@ npm run build
 ```
 
 **功能特性：**
-- 🔐 用户登录 / 认证
-- 📝 笔记列表 + 搜索 + 高亮
-- ✏️ Markdown 编辑器 + 预览
-- 🏷️ 标签树管理
-- 📜 版本历史 + 恢复
-- 🏢 工作区切换
-- 📋 活动日志时间线
-- ⚙️ 设置（工作区 / 用户 / 备份）
-- 📱 响应式设计
+- 🔐 用户登录 / 注册 / JWT 认证
+- 📝 笔记列表 + 全文搜索 + 高亮
+- ✏️ Markdown 编辑器（CodeMirror）+ 实时预览 + 版本历史
+- 🏷️ 层级标签树 + 拖拽管理 + 颜色标记
+- 🔗 双向链接 + 知识图谱
+- 🏢 多工作区切换 + 笔记迁移
+- 📋 活动日志时间线（按操作类型筛选）
+- ⚙️ 设置（工作区管理 / 用户管理 / 备份恢复）
+- 🎨 Apple SF 风格 UI（毛玻璃、微动效、暗色适配）
 
 ### 启动 MCP Server
 
@@ -201,12 +201,12 @@ memomind/
 │   └── client.py
 ├── tests/                   # 测试套件（427 个测试）
 ├── benchmarks/              # 性能基准测试
-├── web/                     # Web Dashboard (React + Vite)
-│   ├── src/                 # 前端源码
-│   │   ├── pages/           # 页面组件
-│   │   ├── lib/             # API 客户端
-│   │   └── App.tsx          # 应用入口
-│   └── dist/                # 构建产物
+├── web/                     # Web Dashboard (React + Vite + Tailwind v4)
+│   └── src/
+│       ├── pages/           # 7 个页面：Login, Notes, NoteEditor, Tags, Activity, Settings
+│       ├── lib/             # API 客户端
+│       ├── index.css         # 设计系统（CSS 变量 + Tailwind）
+│       └── App.tsx          # 路由 + Auth 上下文
 ├── docs/                    # 文档
 ├── cli.py                   # 命令行工具
 ├── requirements.txt         # 依赖
