@@ -19,6 +19,7 @@ from core.auto_tag_service import AutoTagService
 from core.rag_service import RAGService
 from core.summarization_service import SummarizationService
 from core.knowledge_graph_service import KnowledgeGraphService
+from core.dreaming_service import DreamingService
 
 
 def get_db(db_path: str = None) -> Database:
@@ -153,6 +154,61 @@ def cmd_graph(args):
         print(f"  {edge_type}: {count}")
 
 
+def cmd_dream(args):
+    """Dreaming 记忆压缩"""
+    db = get_db(args.db)
+    service = DreamingService(db)
+
+    if args.dream_action == "run":
+        report = service.run_dreaming(
+            strategy=args.strategy,
+            dry_run=args.dry_run
+        )
+        print(f"\nDreaming 报告")
+        print(f"{'='*50}")
+        print(f"  模式: {'预览 (dry-run)' if report['dry_run'] else '正式执行'}")
+        print(f"  策略: {args.strategy}")
+        print(f"  输入记忆: {report['input_count']}")
+        print(f"  输出记忆: {report['output_count']}")
+        print(f"  合并数量: {report['merged_count']}")
+        print(f"  归档数量: {report['archived_count']}")
+        if report['clusters']:
+            print(f"  多元素簇: {len(report['clusters'])}")
+            for i, cluster in enumerate(report['clusters']):
+                print(f"    簇{i+1}: {cluster}")
+        if report['dry_run']:
+            print(f"\n  [预览模式 - 无实际变更]")
+
+    elif args.dream_action == "history":
+        history = service.get_history(limit=args.limit)
+        if not history:
+            print("暂无 Dreaming 记录")
+        else:
+            for s in history:
+                status_icon = {"completed": "[OK]", "failed": "[X]",
+                               "rolled_back": "[R]", "running": "[...]"}.get(
+                    s.get('status', ''), '')
+                print(f"  #{s['id']} {status_icon} "
+                      f"in={s.get('input_count', 0)} out={s.get('output_count', 0)} "
+                      f"merged={s.get('merged_count', 0)} "
+                      f"trigger={s.get('trigger', '')} "
+                      f"started={s.get('started_at', '')}")
+
+    elif args.dream_action == "rollback":
+        result = service.rollback(args.session_id)
+        print(f"回滚 #{args.session_id}: "
+              f"恢复 {result['restored_notes']} 条笔记, "
+              f"删除 {result['deleted_merged_notes']} 条合并笔记")
+
+    elif args.dream_action == "changes":
+        changes = service.get_changes(args.session_id)
+        if not changes:
+            print(f"#{args.session_id} 无变更记录")
+        else:
+            for c in changes:
+                print(f"  {c['change_type']}: {c['source_ids']} -> {c['target_id']}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="MemoMind CLI - 知识库命令行工具")
     parser.add_argument("--db", help="数据库路径")
@@ -201,7 +257,24 @@ def main():
     graph_parser = subparsers.add_parser("graph", help="知识图谱")
     graph_parser.add_argument("--max-nodes", type=int, default=100, help="最大节点数")
     graph_parser.set_defaults(func=cmd_graph)
-    
+
+    # dream
+    dream_parser = subparsers.add_parser("dream", help="记忆压缩 Dreaming")
+    dream_parser.add_argument("dream_action", nargs="?",
+                              default="run",
+                              choices=["run", "history", "rollback", "changes"],
+                              help="操作: run/history/rollback/changes")
+    dream_parser.add_argument("--strategy", default="default",
+                              choices=["default", "aggressive", "conservative"],
+                              help="选择策略")
+    dream_parser.add_argument("--dry-run", action="store_true",
+                              help="预览模式，不写入数据库")
+    dream_parser.add_argument("--session-id", type=int,
+                              help="Dreaming 会话 ID（用于 rollback/changes）")
+    dream_parser.add_argument("--limit", type=int, default=20,
+                              help="历史记录数量")
+    dream_parser.set_defaults(func=cmd_dream)
+
     args = parser.parse_args()
     
     if not args.command:

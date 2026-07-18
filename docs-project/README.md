@@ -40,6 +40,7 @@ docs-project/
 | 09 | [工具竞品分析](./01-product-concept/09-工具竞品分析.md) | 工具类竞品对比 |
 | 10 | [产品概述](./01-product-concept/10-产品概述.md) | 产品定位与概述 |
 | 11 | [核心功能定义](./01-product-concept/11-核心功能定义.md) | 核心功能清单 |
+| 12 | [竞品分析-MindMemOS](./01-product-concept/12-竞品分析-MindMemOS.md) | MindMemOS 竞品分析（2026-07） |
 
 ## 第2类：产品业务逻辑 (`02-business-logic/`)
 
@@ -57,6 +58,7 @@ docs-project/
 | 01 | [整体架构设计](./03-architecture/01-整体架构设计.md) | 系统整体架构 |
 | 02 | [记忆系统架构](./03-architecture/02-记忆系统架构.md) | 记忆模块架构 |
 | 03 | [工具架构设计](./03-architecture/03-工具架构设计.md) | Tool API 架构 |
+| 04 | [记忆系统增强设计-Dreaming与Skills闭环](./03-architecture/04-记忆系统增强设计-Dreaming与Skills闭环.md) | Dreaming 架构设计 + Skills 观察项（2026-07） |
 
 ## 第4类：产品详细设计 (`04-detailed-design/`)
 
@@ -75,6 +77,7 @@ docs-project/
 |---|------|------|
 | 01 | [Phase4开发计划](./05-development-plan/01-Phase4开发计划.md) | Phase 4 Web UI + 生产就绪 |
 | 03 | [知识图谱连通与去重消化方案](./05-development-plan/03-知识图谱连通与去重消化方案.md) | KG连通 + 去重 + 知识消化 |
+| 04 | [记忆增强路线图-Dreaming与Skills](./05-development-plan/04-记忆增强路线图-Dreaming与Skills.md) | Phase 5 记忆增强开发计划（2026-07） |
 
 ## 第6类：测试文档 (`06-test-docs/`)
 
@@ -83,6 +86,7 @@ docs-project/
 | 01 | [分类器v1测试报告](./06-test-docs/01-分类器v1测试报告.md) | PR 分类器 v1 测试结果 |
 | 02 | [分类器v2测试报告](./06-test-docs/02-分类器v2测试报告.md) | PR 分类器 v2 测试结果 |
 | 03 | [记忆系统自动化测试报告](./06-test-docs/03-记忆系统自动化测试报告.md) | 自动化脚本测试报告 |
+| 04 | [记忆系统基准测试报告](./06-test-docs/04-记忆系统基准测试报告.md) | Phase 5.1 首次基线报告（2026-07） |
 
 ---
 

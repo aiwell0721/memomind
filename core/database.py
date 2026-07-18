@@ -78,6 +78,37 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_notes_tags ON notes(tags)
         """)
 
+        # Dreaming 会话记录
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dreaming_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                finished_at TIMESTAMP,
+                trigger TEXT NOT NULL DEFAULT 'manual',
+                status TEXT NOT NULL DEFAULT 'running',
+                input_count INTEGER DEFAULT 0,
+                output_count INTEGER DEFAULT 0,
+                merged_count INTEGER DEFAULT 0,
+                archived_count INTEGER DEFAULT 0,
+                extracted_facts INTEGER DEFAULT 0,
+                error_message TEXT
+            )
+        """)
+
+        # Dreaming 变更追溯
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dreaming_changes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER NOT NULL,
+                change_type TEXT NOT NULL,
+                source_ids TEXT NOT NULL DEFAULT '[]',
+                target_id INTEGER,
+                diff_summary TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES dreaming_sessions(id)
+            )
+        """)
+
         self.conn.commit()
     
     # SQL 写操作的正则：只匹配 notes 主表（含可选 schema 前缀），排除 notes_fts、
