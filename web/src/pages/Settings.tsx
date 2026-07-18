@@ -115,9 +115,7 @@ export default function Settings() {
   const [aiProvider, setAiProvider] = useState('local');
   const [aiApiKey, setAiApiKey] = useState('');
   const [aiModel, setAiModel] = useState('');
-  const [aiEmbed, setAiEmbed] = useState('');
   const [aiBaseUrl, setAiBaseUrl] = useState('');
-  const [aiEmbedBaseUrl, setAiEmbedBaseUrl] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -138,9 +136,7 @@ export default function Settings() {
         setAiConfig(cfg);
         setAiProvider(cfg.provider);
         setAiModel(cfg.model);
-        setAiEmbed(cfg.embed_model);
         setAiBaseUrl(cfg.base_url ?? '');
-        setAiEmbedBaseUrl(cfg.embed_base_url ?? '');
       }).catch(() => {});
     }
     setError(''); setSuccess('');
@@ -227,9 +223,8 @@ export default function Settings() {
         provider: aiProvider,
         api_key: aiApiKey,
         model: aiModel,
-        embed_model: aiEmbed,
+        embed_model: aiModel,
         base_url: aiBaseUrl || undefined,
-        embed_base_url: aiEmbedBaseUrl || undefined,
       });
       setSuccess(`AI 模型已切换为 ${res.provider}`);
       toast('AI 配置已保存');
@@ -245,9 +240,8 @@ export default function Settings() {
         provider: aiProvider,
         api_key: aiApiKey,
         model: aiModel,
-        embed_model: aiEmbed,
+        embed_model: aiModel,
         base_url: aiBaseUrl || undefined,
-        embed_base_url: aiEmbedBaseUrl || undefined,
       });
       setTestResult({ ok: res.status === 'ok', msg: res.message });
     } catch (err: unknown) {
@@ -567,7 +561,7 @@ export default function Settings() {
                   style={{ width: '100%' }}
                 />
                 <div style={{ fontSize: 11, color: 'var(--apple-text-tertiary)', marginTop: 4 }}>
-                  {aiProvider === 'openai' ? '常用: gpt-4o, gpt-4o-mini, deepseek-chat, qwen-max等' : '常用: claude-sonnet-4, claude-haiku-3-5等'}
+                  {aiProvider === 'openai' ? '常用: gpt-4o, deepseek-chat, qwen-max等' : '常用: claude-sonnet-4, claude-haiku-3-5等'}
                 </div>
               </div>
             )}
@@ -592,43 +586,10 @@ export default function Settings() {
               </div>
             )}
 
-            {/* Embed model (OpenAI only) */}
+            {/* Embed hint (just informational) */}
             {aiProvider === 'openai' && (
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--apple-text-secondary)', marginBottom: 6, display: 'block' }}>
-                  向量模型 (Embedding)
-                </label>
-                <input
-                  type="text"
-                  value={aiEmbed}
-                  onChange={(e) => setAiEmbed(e.target.value)}
-                  className="input"
-                  placeholder="text-embedding-3-small / ..."
-                  style={{ width: '100%' }}
-                />
-                <div style={{ fontSize: 11, color: 'var(--apple-text-tertiary)', marginTop: 4 }}>
-                  BAAI/bge-large-zh-v1.5 等本地模型可直接填写模型名
-                </div>
-              </div>
-            )}
-
-            {/* Embed Base URL (OpenAI only) */}
-            {aiProvider === 'openai' && (
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--apple-text-secondary)', marginBottom: 6, display: 'block' }}>
-                  向量 API 地址
-                </label>
-                <input
-                  type="text"
-                  value={aiEmbedBaseUrl}
-                  onChange={(e) => setAiEmbedBaseUrl(e.target.value)}
-                  className="input"
-                  placeholder="留空则使用上方 API 地址"
-                  style={{ width: '100%' }}
-                />
-                <div style={{ fontSize: 11, color: 'var(--apple-text-tertiary)', marginTop: 4 }}>
-                  如向量服务有独立 endpoint 可在此指定，否则留空
-                </div>
+              <div style={{ fontSize: 11, color: 'var(--apple-text-tertiary)', marginBottom: 16, marginTop: -8 }}>
+                向量模型已复用聊天模型，无需单独配置
               </div>
             )}
 
@@ -678,9 +639,7 @@ export default function Settings() {
               <div><span style={{ color: 'var(--apple-text-secondary)' }}>提供商:</span> {aiConfig?.provider || 'local'}</div>
               <div><span style={{ color: 'var(--apple-text-secondary)' }}>API Key:</span> {aiConfig?.has_key ? '✅ 已配置' : '⚠️ 未配置'}</div>
               <div><span style={{ color: 'var(--apple-text-secondary)' }}>模型:</span> {aiConfig?.model || '默认'}</div>
-              <div><span style={{ color: 'var(--apple-text-secondary)' }}>向量模型:</span> {aiConfig?.embed_model || '默认'}</div>
               {aiConfig?.base_url && <div><span style={{ color: 'var(--apple-text-secondary)' }}>API 地址:</span> {aiConfig.base_url}</div>}
-              {aiConfig?.embed_base_url && <div><span style={{ color: 'var(--apple-text-secondary)' }}>向量 API:</span> {aiConfig.embed_base_url}</div>}
             </div>
           </div>
         </div>
