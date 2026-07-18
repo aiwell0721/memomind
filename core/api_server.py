@@ -25,6 +25,10 @@ from pydantic import BaseModel, Field
 
 from .database import Database
 from .search_service import SearchService
+from .rag_service import RAGService, RAGAnswer
+from .summarization_service import SummarizationService
+from .auto_tag_service import AutoTagService
+from .semantic_service import SemanticService
 from .version_service import VersionService
 from .tag_service import TagService
 from .link_service import LinkService
@@ -131,6 +135,17 @@ class AiConfigModel(BaseModel):
     api_key: str = Field(default="")
     model: str = Field(default="")
     embed_model: str = Field(default="")
+
+
+class AskRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=2000)
+    workspace_id: Optional[int] = None
+    max_sources: int = Field(5, ge=1, le=20)
+
+
+class SummarizeRequest(BaseModel):
+    max_length: int = Field(200, ge=50, le=2000)
+    method: str = Field("extractive", pattern=r"^(extractive|abstractive)$")
 
 
 # ==================== 认证 ====================
@@ -375,6 +390,11 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
             os.environ["OPENAI_EMBED_MODEL"] = _saved_cfg["embed_model"]
     
     ai_provider = create_provider()
+    
+    # ==================== AI 服务初始化 ====================
+    rag = RAGService(db, provider=ai_provider)
+    summarization = SummarizationService(db, provider=ai_provider)
+    auto_tag = AutoTagService(db)
     
     # ==================== 笔记 API ====================
     
@@ -866,6 +886,76 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
         """清理旧备份（保留最近 N 个）"""
         deleted = backup.cleanup_old_backups(keep_count)
         return {'deleted': deleted, 'kept': keep_count}
+    
+    # ==================== AI 功能 API ====================
+    
+    @app.post("/api/ask", summary="RAG 问答")
+    def ask_question(req: AskRequest, _: dict = Depends(verify_token)):
+        """基于笔记内容进行自然语言问答"""
+        try:
+            answer = rag.ask(
+                question=req.question,
+                workspace_id=req.workspace_id,
+                max_sources=req.max_sources,
+            )
+            return {
+                "answer": answer.answer,
+                "sources": answer.sources,
+                "confidence": answer.confidence,
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"问答失败: {str(e)}")
+    
+    @app.post("/api/notes/{note_id}/summarize", summary="AI 摘要")
+    def summarize_note(note_id: int, req: SummarizeRequest, _: dict = Depends(verify_token)):
+        """为笔记生成 AI 摘要"""
+        try:
+            summary = summarization.summarize(
+                note_id=note_id,
+                max_length=req.max_length,
+                method=req.method,
+            )
+            if summary is None:
+                raise HTTPException(status_code=404, detail="笔记不存在")
+            return {"note_id": note_id, "summary": summary}
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"摘要生成失败: {str(e)}")
+    
+    @app.post("/api/tags/auto/{note_id}", summary="自动标签")
+    def auto_tag_note(note_id: int, _: dict = Depends(verify_token)):
+        """自动为笔记推荐标签"""
+        try:
+            tags_list = auto_tag.auto_tag_note(note_id)
+            return {"note_id": note_id, "tags": tags_list}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"自动标签失败: {str(e)}")
+    
+    @app.post("/api/search/semantic", summary="语义搜索")
+    def semantic_search(params: NoteSearch, _: dict = Depends(verify_token)):
+        """基于语义的混合搜索（全文 + 向量）"""
+        try:
+            semantic = SemanticService(db)
+            semantic.provider = ai_provider
+            results = semantic.hybrid_search(
+                query=params.query,
+                workspace_id=params.workspace_id,
+                limit=params.limit,
+            )
+            return [{
+                'note': {
+                    'id': r.note.id,
+                    'title': r.note.title,
+                    'content': r.note.content[:200],
+                    'tags': r.note.tags,
+                    'workspace_id': getattr(r.note, 'workspace_id', 1),
+                },
+                'score': r.score,
+                'highlights': r.highlights,
+            } for r in results]
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"语义搜索失败: {str(e)}")
     
     # ==================== AI 设置 API ====================
     
