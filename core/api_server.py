@@ -6,6 +6,7 @@ MemoMind REST API 服务器 - PR-016
 import os
 import secrets
 import time
+import sys
 from typing import List, Optional, Dict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -14,6 +15,8 @@ from pathlib import Path
 _SERVER_START = time.time()
 
 from fastapi import FastAPI, HTTPException, Query, Depends, status, Request, WebSocket, WebSocketDisconnect
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -119,6 +122,15 @@ class TokenResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str
+
+
+# ==================== AI 配置模型 ====================
+
+class AiConfigModel(BaseModel):
+    provider: str = Field(default="local", pattern=r"^(local|openai|anthropic)$")
+    api_key: str = Field(default="")
+    model: str = Field(default="")
+    embed_model: str = Field(default="")
 
 
 # ==================== 认证 ====================
@@ -313,6 +325,55 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
     conflict = ConflictService(db)
     backup = BackupService(db)
     collaboration = CollaborationService(db)
+    
+    # ==================== AI Provider 配置管理 ====================
+    
+    _config_path = os.path.join(os.path.dirname(db_path), "memomind.json")
+    
+    def _load_ai_config() -> dict:
+        """从 JSON 配置文件读取 AI 设置"""
+        if os.path.isfile(_config_path):
+            try:
+                import json
+                with open(_config_path, "r") as f:
+                    data = json.load(f)
+                return data.get("ai", {})
+            except (json.JSONDecodeError, IOError):
+                pass
+        return {}
+    
+    def _save_ai_config(cfg: dict):
+        """保存 AI 设置到 JSON 配置文件"""
+        import json
+        existing = {}
+        if os.path.isfile(_config_path):
+            try:
+                with open(_config_path, "r") as f:
+                    existing = json.load(f)
+            except (json.JSONDecodeError, IOError):
+                pass
+        existing["ai"] = cfg
+        with open(_config_path, "w") as f:
+            json.dump(existing, f, indent=2)
+    
+    # 从配置文件加载并应用 AI 设置（优先于环境变量）
+    _saved_cfg = _load_ai_config()
+    if _saved_cfg.get("provider") and _saved_cfg.get("provider") != "local":
+        # 用配置文件覆盖环境变量
+        os.environ["MEMOMIND_AI_PROVIDER"] = _saved_cfg["provider"]
+        if _saved_cfg.get("api_key"):
+            if _saved_cfg["provider"] == "openai":
+                os.environ["OPENAI_API_KEY"] = _saved_cfg["api_key"]
+            elif _saved_cfg["provider"] == "anthropic":
+                os.environ["ANTHROPIC_API_KEY"] = _saved_cfg["api_key"]
+        if _saved_cfg.get("model"):
+            if _saved_cfg["provider"] == "openai":
+                os.environ["OPENAI_MODEL"] = _saved_cfg["model"]
+            elif _saved_cfg["provider"] == "anthropic":
+                os.environ["ANTHROPIC_MODEL"] = _saved_cfg["model"]
+        if _saved_cfg.get("embed_model"):
+            os.environ["OPENAI_EMBED_MODEL"] = _saved_cfg["embed_model"]
+    
     ai_provider = create_provider()
     
     # ==================== 笔记 API ====================
@@ -806,6 +867,55 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
         deleted = backup.cleanup_old_backups(keep_count)
         return {'deleted': deleted, 'kept': keep_count}
     
+    # ==================== AI 设置 API ====================
+    
+    @app.get("/api/settings/ai", summary="获取 AI 配置")
+    def get_ai_config(_: dict = Depends(verify_token)):
+        """返回当前 AI 配置（不含 api_key）"""
+        cfg = _load_ai_config()
+        return {
+            "provider": cfg.get("provider", "local"),
+            "has_key": bool(cfg.get("api_key") or os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")),
+            "model": cfg.get("model", ""),
+            "embed_model": cfg.get("embed_model", ""),
+        }
+    
+    @app.put("/api/settings/ai", summary="保存 AI 配置")
+    def save_ai_config(cfg: AiConfigModel, _: dict = Depends(verify_token)):
+        """保存 AI 配置并立即生效"""
+        new_cfg = {
+            "provider": cfg.provider,
+            "api_key": cfg.api_key,
+            "model": cfg.model,
+            "embed_model": cfg.embed_model,
+        }
+        # 保留现有 Key（如用户未输入新 Key）
+        if not cfg.api_key:
+            existing = _load_ai_config()
+            new_cfg["api_key"] = existing.get("api_key", "")
+        _save_ai_config(new_cfg)
+        
+        # 立即生效：更新环境变量 + 重建 provider
+        os.environ["MEMOMIND_AI_PROVIDER"] = cfg.provider
+        if cfg.provider == "openai":
+            if cfg.api_key:
+                os.environ["OPENAI_API_KEY"] = cfg.api_key
+            if cfg.model:
+                os.environ["OPENAI_MODEL"] = cfg.model
+            if cfg.embed_model:
+                os.environ["OPENAI_EMBED_MODEL"] = cfg.embed_model
+        elif cfg.provider == "anthropic":
+            if cfg.api_key:
+                os.environ["ANTHROPIC_API_KEY"] = cfg.api_key
+            if cfg.model:
+                os.environ["ANTHROPIC_MODEL"] = cfg.model
+        
+        # 重新创建 provider
+        nonlocal ai_provider
+        ai_provider = create_provider()
+        
+        return {"status": "ok", "provider": cfg.provider}
+    
     # ==================== 认证 API ====================
     
     @app.post("/api/auth/login", response_model=TokenResponse, summary="登录")
@@ -957,5 +1067,40 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
 
         await websocket.accept()
         await collaboration.handle_connection(websocket, note_id, user_id, username, db=db)
+    
+    # ==================== 前端静态文件服务 ====================
+    
+    # 查找前端构建文件目录（相对于打包后的 exe 位置或源码目录）
+    _static_dir = None
+    
+    if getattr(sys, 'frozen', False):
+        # PyInstaller 打包后：数据文件在 _internal/ 目录
+        _candidate = os.path.join(sys._MEIPASS, 'dist')
+    else:
+        # 开发模式：项目根目录下的 web/dist
+        _candidate = os.path.join(os.getcwd(), 'web', 'dist')
+    
+    if os.path.isdir(_candidate) and os.path.isfile(os.path.join(_candidate, 'index.html')):
+        _static_dir = os.path.abspath(_candidate)
+    
+    if not _static_dir:
+        print(f"[MemoMind] WARNING: Frontend static files not found at: {_candidate}")
+    
+    if _static_dir:
+        app.mount("/assets", StaticFiles(directory=os.path.join(_static_dir, "assets")), name="assets")
+        
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def serve_frontend(full_path: str):
+            # API 路径不拦截
+            if full_path.startswith("api/") or full_path.startswith("ws/"):
+                from fastapi.responses import JSONResponse
+                return JSONResponse({"detail": "Not Found"}, status_code=404)
+            
+            file_path = os.path.join(_static_dir, full_path)
+            if os.path.isfile(file_path):
+                return FileResponse(file_path)
+            
+            # SPA fallback：所有非 API 路径返回 index.html
+            return FileResponse(os.path.join(_static_dir, "index.html"))
     
     return app

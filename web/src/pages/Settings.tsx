@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { toast } from '../App';
-import type { Workspace, User, Backup } from '../lib/api';
+import type { Workspace, User, Backup, AiConfig } from '../lib/api';
 
 /* ═══════════════════════════════════════════
    Tab Icons
@@ -27,6 +27,13 @@ const tabIcons: Record<string, React.ReactNode> = {
       <ellipse cx="12" cy="5" rx="9" ry="3" />
       <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
       <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+    </svg>
+  ),
+  ai: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2a4 4 0 0 1 4 4c0 2-2 3-2 5h-4c0-2-2-3-2-5a4 4 0 0 1 4-4z" />
+      <path d="M12 17v3" />
+      <path d="M8 22h8" />
     </svg>
   ),
 };
@@ -95,12 +102,22 @@ function ConfirmDelete({ onConfirm, message = '确定删除？' }: { onConfirm: 
    ═══════════════════════════════════════════ */
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState<'workspaces' | 'users' | 'backups'>('workspaces');
+  const [activeTab, setActiveTab] = useState<'workspaces' | 'users' | 'backups' | 'ai'>('workspaces');
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [backups, setBackups] = useState<Backup[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  /* ── AI Config state ── */
+  const [aiConfig, setAiConfig] = useState<AiConfig | null>(null);
+  const [aiProvider, setAiProvider] = useState('local');
+  const [aiApiKey, setAiApiKey] = useState('');
+  const [aiModel, setAiModel] = useState('');
+  const [aiEmbed, setAiEmbed] = useState('');
+  const [showKey, setShowKey] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   /* ── Form state ── */
   const [newWsName, setNewWsName] = useState('');
@@ -112,6 +129,15 @@ export default function Settings() {
     if (activeTab === 'workspaces') api.workspaces().then(setWorkspaces).catch(() => {});
     else if (activeTab === 'users') api.users().then(setUsers).catch(() => {});
     else if (activeTab === 'backups') api.backups(50).then(setBackups).catch(() => {});
+    else if (activeTab === 'ai') {
+      api.getAiConfig().then((cfg) => {
+        setAiConfig(cfg);
+        setAiProvider(cfg.provider);
+        setAiModel(cfg.model);
+        setAiEmbed(cfg.embed_model);
+      }).catch(() => {});
+    }
+    setError(''); setSuccess('');
   }, [activeTab]);
 
   /* ── Workspace CRUD ── */
@@ -187,10 +213,28 @@ export default function Settings() {
     }
   };
 
+  /* ── AI Config ── */
+  const handleSaveAiConfig = async () => {
+    setSaving(true); setError(''); setSuccess('');
+    try {
+      const res = await api.saveAiConfig({
+        provider: aiProvider,
+        api_key: aiApiKey,
+        model: aiModel,
+        embed_model: aiEmbed,
+      });
+      setSuccess(`AI 模型已切换为 ${res.provider}`);
+      toast('AI 配置已保存');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '保存失败');
+    } finally { setSaving(false); }
+  };
+
   const tabs = [
     { id: 'workspaces' as const, label: '工作区', count: workspaces.length },
     { id: 'users' as const, label: '用户', count: users.length },
     { id: 'backups' as const, label: '备份', count: backups.length },
+    { id: 'ai' as const, label: 'AI 模型', count: undefined },
   ];
 
   return (
@@ -205,6 +249,12 @@ export default function Settings() {
           {error}
         </div>
       )}
+      {/* ── Success ── */}
+      {success && (
+        <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', background: 'rgba(52,199,89,0.1)', borderRadius: 10, color: 'var(--accent)', fontSize: 13 }}>
+          {success}
+        </div>
+      )}
 
       {/* ═══ Segmented Control Tabs ═══ */}
       <div className="segmented-control" style={{ marginBottom: '1.5rem' }}>
@@ -216,14 +266,16 @@ export default function Settings() {
           >
             {tabIcons[tab.id]}
             {tab.label}
-            <span style={{
-              fontSize: 10, fontWeight: 600, marginLeft: 2,
-              background: activeTab === tab.id ? 'var(--accent-light)' : 'rgba(0,0,0,0.06)',
-              color: activeTab === tab.id ? 'var(--accent)' : 'var(--apple-text-secondary)',
-              borderRadius: 8, padding: '0 6px', minWidth: 20, textAlign: 'center',
-            }}>
-              {tab.count}
-            </span>
+            {tab.count !== undefined && (
+              <span style={{
+                fontSize: 10, fontWeight: 600, marginLeft: 2,
+                background: activeTab === tab.id ? 'var(--accent-light)' : 'rgba(0,0,0,0.06)',
+                color: activeTab === tab.id ? 'var(--accent)' : 'var(--apple-text-secondary)',
+                borderRadius: 8, padding: '0 6px', minWidth: 20, textAlign: 'center',
+              }}>
+                {tab.count}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -418,6 +470,129 @@ export default function Settings() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════
+          AI 模型 Tab
+          ═══════════════════════════════ */}
+      {activeTab === 'ai' && (
+        <div>
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>大模型配置</h3>
+
+            {/* Provider */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--apple-text-secondary)', marginBottom: 6, display: 'block' }}>
+                AI 提供商
+              </label>
+              <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
+                {['local', 'openai', 'anthropic'].map((p) => (
+                  <button
+                    key={p}
+                    className={`segmented-control-btn ${aiProvider === p ? 'active' : ''}`}
+                    style={{ fontSize: 13, padding: '0.375rem 1rem' }}
+                    onClick={() => { setAiProvider(p); setError(''); setSuccess(''); }}
+                  >
+                    {p === 'local' ? '本地模式' : p === 'openai' ? 'OpenAI' : 'Anthropic'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* API Key (only for cloud providers) */}
+            {aiProvider !== 'local' && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--apple-text-secondary)', marginBottom: 6, display: 'block' }}>
+                  API Key {aiConfig?.has_key ? '✅ 已配置' : '⚠️ 未设置'}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type={showKey ? 'text' : 'password'}
+                    value={aiApiKey}
+                    onChange={(e) => setAiApiKey(e.target.value)}
+                    className="input"
+                    placeholder={aiConfig?.has_key ? '输入新 Key 以替换现有 Key' : 'sk-...'}
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    style={{ padding: '0.375rem 0.75rem', fontSize: 12 }}
+                    onClick={() => setShowKey(!showKey)}
+                    title={showKey ? '隐藏' : '显示'}
+                  >
+                    {showKey ? '🙈' : '👁️'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Model name */}
+            {aiProvider !== 'local' && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--apple-text-secondary)', marginBottom: 6, display: 'block' }}>
+                  模型名称
+                </label>
+                <input
+                  type="text"
+                  value={aiModel}
+                  onChange={(e) => setAiModel(e.target.value)}
+                  className="input"
+                  placeholder={aiProvider === 'openai' ? 'gpt-4o-mini' : 'claude-sonnet-4-6'}
+                  style={{ width: '100%' }}
+                />
+                <div style={{ fontSize: 11, color: 'var(--apple-text-tertiary)', marginTop: 4 }}>
+                  {aiProvider === 'openai' ? '常用: gpt-4o, gpt-4o-mini, gpt-4.1' : '常用: claude-sonnet-4-6, claude-haiku-3-5'}
+                </div>
+              </div>
+            )}
+
+            {/* Embed model (OpenAI only) */}
+            {aiProvider === 'openai' && (
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--apple-text-secondary)', marginBottom: 6, display: 'block' }}>
+                  向量模型 (Embedding)
+                </label>
+                <input
+                  type="text"
+                  value={aiEmbed}
+                  onChange={(e) => setAiEmbed(e.target.value)}
+                  className="input"
+                  placeholder="text-embedding-3-small"
+                  style={{ width: '100%' }}
+                />
+              </div>
+            )}
+
+            {/* Local mode hint */}
+            {aiProvider === 'local' && (
+              <div style={{
+                padding: '0.75rem 1rem', background: 'rgba(0,0,0,0.03)', borderRadius: 10,
+                fontSize: 12, color: 'var(--apple-text-secondary)', marginBottom: 16,
+              }}>
+                本地模式使用内置的轻量模型，无需 API Key。
+                如需更智能的摘要和问答，请切换为 OpenAI 或 Anthropic。
+              </div>
+            )}
+
+            {/* Save button */}
+            <button className="btn btn-primary" onClick={handleSaveAiConfig} disabled={saving}>
+              {saving ? '保存中...' : '保存配置'}
+            </button>
+          </div>
+
+          {/* Current status */}
+          <div className="card" style={{ padding: '0.75rem 1rem' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--apple-text-secondary)', marginBottom: 8 }}>
+              当前状态
+            </div>
+            <div style={{ fontSize: 13, lineHeight: 1.8 }}>
+              <div><span style={{ color: 'var(--apple-text-secondary)' }}>提供商:</span> {aiConfig?.provider || 'local'}</div>
+              <div><span style={{ color: 'var(--apple-text-secondary)' }}>API Key:</span> {aiConfig?.has_key ? '✅ 已配置' : '⚠️ 未配置'}</div>
+              <div><span style={{ color: 'var(--apple-text-secondary)' }}>模型:</span> {aiConfig?.model || '默认'}</div>
+              <div><span style={{ color: 'var(--apple-text-secondary)' }}>向量模型:</span> {aiConfig?.embed_model || '默认'}</div>
+            </div>
+          </div>
         </div>
       )}
     </div>

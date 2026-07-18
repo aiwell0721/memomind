@@ -331,7 +331,7 @@ class MemoMind:
         client.links.create(source_id, target_id)
     """
     
-    def __init__(self, db_path: str = "~/memomind.db"):
+    def __init__(self, db_path: str = str(Path.home() / ".memomind" / "memomind.db")):
         """
         初始化 MemoMind 客户端
         

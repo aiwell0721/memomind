@@ -124,6 +124,14 @@ export const api = {
 
   // Health
   health: () => request<{ status: string; version: string }>('/health'),
+
+  // AI Settings
+  getAiConfig: () => request<AiConfig>('/settings/ai'),
+  saveAiConfig: (cfg: { provider: string; api_key: string; model: string; embed_model: string }) =>
+    request<{ status: string; provider: string }>('/settings/ai', {
+      method: 'PUT',
+      body: JSON.stringify(cfg),
+    }),
 };
 
 // Types
@@ -198,6 +206,13 @@ export interface Backup {
   description: string;
   size: number;
   created_at: string;
+}
+
+export interface AiConfig {
+  provider: string;
+  has_key: boolean;
+  model: string;
+  embed_model: string;
 }
 
 // ==================== WebSocket 协作 ====================
