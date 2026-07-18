@@ -126,10 +126,16 @@ export const api = {
   health: () => request<{ status: string; version: string }>('/health'),
 
   // AI Settings
-  getAiConfig: () => request<AiConfig>('/settings/ai'),
+  getAiConfig: (provider?: string) =>
+    request<AiConfig>(`/settings/ai${provider ? `?provider=${provider}` : ''}`),
   saveAiConfig: (cfg: { provider: string; api_key: string; model: string; embed_model: string; base_url?: string; embed_base_url?: string }) =>
     request<{ status: string; provider: string }>('/settings/ai', {
       method: 'PUT',
+      body: JSON.stringify(cfg),
+    }),
+  testAiConnection: (cfg: { provider: string; api_key: string; model: string; embed_model: string; base_url?: string; embed_base_url?: string }) =>
+    request<{ status: string; message: string }>('/settings/ai/test', {
+      method: 'POST',
       body: JSON.stringify(cfg),
     }),
 };

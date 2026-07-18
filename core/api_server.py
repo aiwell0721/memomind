@@ -347,56 +347,65 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
     
     _config_path = os.path.join(os.path.dirname(db_path), "memomind.json")
     
-    def _load_ai_config() -> dict:
-        """从 JSON 配置文件读取 AI 设置"""
+    # ── 配置文件操作（按 provider 分别存储）──
+    def _load_all_configs() -> dict:
+        """读取完整配置文件"""
         if os.path.isfile(_config_path):
             try:
                 import json
                 with open(_config_path, "r") as f:
-                    data = json.load(f)
-                return data.get("ai", {})
+                    return json.load(f)
             except (json.JSONDecodeError, IOError):
                 pass
         return {}
     
-    def _save_ai_config(cfg: dict):
-        """保存 AI 设置到 JSON 配置文件"""
-        import json
-        existing = {}
-        if os.path.isfile(_config_path):
-            try:
-                with open(_config_path, "r") as f:
-                    existing = json.load(f)
-            except (json.JSONDecodeError, IOError):
-                pass
-        existing["ai"] = cfg
-        with open(_config_path, "w") as f:
-            json.dump(existing, f, indent=2)
+    def _get_active_provider() -> str:
+        """获取当前活跃的 provider"""
+        return _load_all_configs().get("active", "local")
     
-    # 从配置文件加载并应用 AI 设置（优先于环境变量）
-    _saved_cfg = _load_ai_config()
-    if _saved_cfg.get("provider") and _saved_cfg.get("provider") != "local":
-        # 用配置文件覆盖环境变量
-        os.environ["MEMOMIND_AI_PROVIDER"] = _saved_cfg["provider"]
-        if _saved_cfg.get("api_key"):
-            if _saved_cfg["provider"] == "openai":
-                os.environ["OPENAI_API_KEY"] = _saved_cfg["api_key"]
-            elif _saved_cfg["provider"] == "anthropic":
-                os.environ["ANTHROPIC_API_KEY"] = _saved_cfg["api_key"]
-        if _saved_cfg.get("model"):
-            if _saved_cfg["provider"] == "openai":
-                os.environ["OPENAI_MODEL"] = _saved_cfg["model"]
-            elif _saved_cfg["provider"] == "anthropic":
-                os.environ["ANTHROPIC_MODEL"] = _saved_cfg["model"]
-        if _saved_cfg.get("embed_model"):
-            os.environ["OPENAI_EMBED_MODEL"] = _saved_cfg["embed_model"]
-        if _saved_cfg.get("base_url"):
-            if _saved_cfg["provider"] == "openai":
-                os.environ["OPENAI_BASE_URL"] = _saved_cfg["base_url"]
-            elif _saved_cfg["provider"] == "anthropic":
-                os.environ["ANTHROPIC_BASE_URL"] = _saved_cfg["base_url"]
-        if _saved_cfg.get("embed_base_url"):
-            os.environ["OPENAI_EMBED_BASE_URL"] = _saved_cfg["embed_base_url"]
+    def _get_provider_config(provider: str) -> dict:
+        """读取指定 provider 的配置"""
+        return _load_all_configs().get("providers", {}).get(provider, {})
+    
+    def _save_provider_config(provider: str, cfg: dict):
+        """保存指定 provider 的配置"""
+        import json
+        all_cfgs = _load_all_configs()
+        providers = all_cfgs.setdefault("providers", {})
+        providers[provider] = cfg
+        all_cfgs["active"] = provider
+        with open(_config_path, "w") as f:
+            json.dump(all_cfgs, f, indent=2)
+    
+    # 向后兼容别名
+    _load_ai_config = lambda: _get_provider_config(_get_active_provider())
+    def _save_ai_config(cfg: dict):
+        _save_provider_config(cfg.get("provider", "openai"), cfg)
+    
+    # ── 启动时应用已保存的配置 ──
+    _active = _get_active_provider()
+    if _active and _active != "local":
+        _saved = _get_provider_config(_active)
+        os.environ["MEMOMIND_AI_PROVIDER"] = _active
+        if _saved.get("api_key"):
+            if _active == "openai":
+                os.environ["OPENAI_API_KEY"] = _saved["api_key"]
+            elif _active == "anthropic":
+                os.environ["ANTHROPIC_API_KEY"] = _saved["api_key"]
+        if _saved.get("model"):
+            if _active == "openai":
+                os.environ["OPENAI_MODEL"] = _saved["model"]
+            elif _active == "anthropic":
+                os.environ["ANTHROPIC_MODEL"] = _saved["model"]
+        if _saved.get("embed_model"):
+            os.environ["OPENAI_EMBED_MODEL"] = _saved["embed_model"]
+        if _saved.get("base_url"):
+            if _active == "openai":
+                os.environ["OPENAI_BASE_URL"] = _saved["base_url"]
+            elif _active == "anthropic":
+                os.environ["ANTHROPIC_BASE_URL"] = _saved["base_url"]
+        if _saved.get("embed_base_url"):
+            os.environ["OPENAI_EMBED_BASE_URL"] = _saved["embed_base_url"]
     
     ai_provider = create_provider()
     
@@ -969,12 +978,17 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
     # ==================== AI 设置 API ====================
     
     @app.get("/api/settings/ai", summary="获取 AI 配置")
-    def get_ai_config(_: dict = Depends(verify_token)):
-        """返回当前 AI 配置（不含 api_key）"""
-        cfg = _load_ai_config()
+    def get_ai_config(provider: str = Query(default="", description="指定 provider，空则返回当前活跃的"), _: dict = Depends(verify_token)):
+        """返回 AI 配置（不含 api_key 原文）"""
+        p = provider if provider else _get_active_provider()
+        cfg = _get_provider_config(p)
         return {
-            "provider": cfg.get("provider", "local"),
-            "has_key": bool(cfg.get("api_key") or os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")),
+            "provider": p,
+            "has_key": bool(
+                cfg.get("api_key") or
+                os.environ.get("OPENAI_API_KEY") or
+                os.environ.get("ANTHROPIC_API_KEY")
+            ),
             "model": cfg.get("model", ""),
             "embed_model": cfg.get("embed_model", ""),
             "base_url": cfg.get("base_url", ""),
@@ -983,47 +997,78 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
     
     @app.put("/api/settings/ai", summary="保存 AI 配置")
     def save_ai_config(cfg: AiConfigModel, _: dict = Depends(verify_token)):
-        """保存 AI 配置并立即生效"""
+        """保存 AI 配置并立即生效（按 provider 分别存储）"""
+        # 从当前 provider 保留未输入的 Key
+        existing = _get_provider_config(cfg.provider)
         new_cfg = {
-            "provider": cfg.provider,
-            "api_key": cfg.api_key,
+            "api_key": cfg.api_key if cfg.api_key else existing.get("api_key", ""),
             "model": cfg.model,
             "embed_model": cfg.embed_model,
             "base_url": cfg.base_url,
             "embed_base_url": cfg.embed_base_url,
         }
-        # 保留现有 Key（如用户未输入新 Key）
-        if not cfg.api_key:
-            existing = _load_ai_config()
-            new_cfg["api_key"] = existing.get("api_key", "")
-        _save_ai_config(new_cfg)
+        _save_provider_config(cfg.provider, new_cfg)
         
         # 立即生效：更新环境变量 + 重建 provider
         os.environ["MEMOMIND_AI_PROVIDER"] = cfg.provider
         if cfg.provider == "openai":
-            if cfg.api_key:
-                os.environ["OPENAI_API_KEY"] = cfg.api_key
-            if cfg.model:
-                os.environ["OPENAI_MODEL"] = cfg.model
-            if cfg.embed_model:
-                os.environ["OPENAI_EMBED_MODEL"] = cfg.embed_model
-            if cfg.base_url:
-                os.environ["OPENAI_BASE_URL"] = cfg.base_url
-            if cfg.embed_base_url:
-                os.environ["OPENAI_EMBED_BASE_URL"] = cfg.embed_base_url
+            os.environ["OPENAI_API_KEY"] = new_cfg["api_key"]
+            os.environ["OPENAI_MODEL"] = new_cfg["model"]
+            os.environ["OPENAI_EMBED_MODEL"] = new_cfg["embed_model"]
+            if new_cfg["base_url"]:
+                os.environ["OPENAI_BASE_URL"] = new_cfg["base_url"]
+            if new_cfg["embed_base_url"]:
+                os.environ["OPENAI_EMBED_BASE_URL"] = new_cfg["embed_base_url"]
         elif cfg.provider == "anthropic":
-            if cfg.api_key:
-                os.environ["ANTHROPIC_API_KEY"] = cfg.api_key
-            if cfg.model:
-                os.environ["ANTHROPIC_MODEL"] = cfg.model
-            if cfg.base_url:
-                os.environ["ANTHROPIC_BASE_URL"] = cfg.base_url
+            os.environ["ANTHROPIC_API_KEY"] = new_cfg["api_key"]
+            os.environ["ANTHROPIC_MODEL"] = new_cfg["model"]
+            if new_cfg["base_url"]:
+                os.environ["ANTHROPIC_BASE_URL"] = new_cfg["base_url"]
         
         # 重新创建 provider
         nonlocal ai_provider
         ai_provider = create_provider()
         
         return {"status": "ok", "provider": cfg.provider}
+    
+    @app.post("/api/settings/ai/test", summary="测试 AI 连接")
+    def test_ai_connection(cfg: AiConfigModel, _: dict = Depends(verify_token)):
+        """用当前填写的配置测试 API 连通性"""
+        try:
+            # 临时创建 provider 测试
+            tmp_provider = None
+            if cfg.provider == "openai":
+                from .ai_openai import OpenAIProvider
+                tmp_provider = OpenAIProvider(
+                    api_key=cfg.api_key,
+                    model=cfg.model or "gpt-4o-mini",
+                    base_url=cfg.base_url,
+                    embed_base_url=cfg.embed_base_url,
+                )
+                # 轻量调用测试连通性
+                resp = tmp_provider.client.chat.completions.create(
+                    model=cfg.model or "gpt-4o-mini",
+                    messages=[{"role": "user", "content": "Hi"}],
+                    max_tokens=5,
+                )
+                return {"status": "ok", "message": f"✅ 连接成功（模型: {resp.choices[0].message.content[:20]}）"}
+            elif cfg.provider == "anthropic":
+                from .ai_anthropic import AnthropicProvider
+                tmp_provider = AnthropicProvider(
+                    api_key=cfg.api_key,
+                    model=cfg.model or "claude-sonnet-4-6",
+                    base_url=cfg.base_url,
+                )
+                resp = tmp_provider.client.messages.create(
+                    model=cfg.model or "claude-sonnet-4-6",
+                    max_tokens=5,
+                    messages=[{"role": "user", "content": "Hi"}],
+                )
+                return {"status": "ok", "message": f"✅ 连接成功（{resp.content[0].text[:20]}）"}
+            else:
+                return {"status": "ok", "message": "本地模式无需测试"}
+        except Exception as e:
+            return {"status": "error", "message": f"❌ 连接失败: {str(e)}"}
     
     # ==================== 认证 API ====================
     

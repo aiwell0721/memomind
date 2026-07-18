@@ -120,6 +120,8 @@ export default function Settings() {
   const [aiEmbedBaseUrl, setAiEmbedBaseUrl] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   /* ── Form state ── */
   const [newWsName, setNewWsName] = useState('');
@@ -132,7 +134,7 @@ export default function Settings() {
     else if (activeTab === 'users') api.users().then(setUsers).catch(() => {});
     else if (activeTab === 'backups') api.backups(50).then(setBackups).catch(() => {});
     else if (activeTab === 'ai') {
-      api.getAiConfig().then((cfg) => {
+      api.getAiConfig(aiProvider).then((cfg) => {
         setAiConfig(cfg);
         setAiProvider(cfg.provider);
         setAiModel(cfg.model);
@@ -234,6 +236,23 @@ export default function Settings() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '保存失败');
     } finally { setSaving(false); }
+  };
+  
+  const handleTestConnection = async () => {
+    setTesting(true); setTestResult(null); setError('');
+    try {
+      const res = await api.testAiConnection({
+        provider: aiProvider,
+        api_key: aiApiKey,
+        model: aiModel,
+        embed_model: aiEmbed,
+        base_url: aiBaseUrl || undefined,
+        embed_base_url: aiEmbedBaseUrl || undefined,
+      });
+      setTestResult({ ok: res.status === 'ok', msg: res.message });
+    } catch (err: unknown) {
+      setTestResult({ ok: false, msg: err instanceof Error ? err.message : '连接测试失败' });
+    } finally { setTesting(false); }
   };
 
   const tabs = [
@@ -498,7 +517,7 @@ export default function Settings() {
                     key={p}
                     className={`segmented-control-btn ${aiProvider === p ? 'active' : ''}`}
                     style={{ fontSize: 13, padding: '0.375rem 1rem' }}
-                    onClick={() => { setAiProvider(p); setError(''); setSuccess(''); }}
+                    onClick={() => { setAiProvider(p); setError(''); setSuccess(''); setTestResult(null); }}
                   >
                     {p === 'local' ? '本地' : p === 'openai' ? 'OpenAI 协议' : 'Anthropic 协议'}
                   </button>
@@ -624,10 +643,30 @@ export default function Settings() {
               </div>
             )}
 
-            {/* Save button */}
-            <button className="btn btn-primary" onClick={handleSaveAiConfig} disabled={saving}>
-              {saving ? '保存中...' : '保存配置'}
-            </button>
+            {/* Test connection + Save buttons */}
+            <div className="flex gap-2" style={{ marginBottom: 16 }}>
+              {aiProvider !== 'local' && (
+                <button className="btn btn-ghost" onClick={handleTestConnection} disabled={testing} style={{ fontSize: 13 }}>
+                  {testing ? '测试中...' : '🔌 测试连接'}
+                </button>
+              )}
+              <button className="btn btn-primary" onClick={handleSaveAiConfig} disabled={saving}>
+                {saving ? '保存中...' : '💾 保存配置'}
+              </button>
+            </div>
+
+            {/* Test result */}
+            {testResult && (
+              <div style={{
+                padding: '0.5rem 0.75rem', borderRadius: 8, marginBottom: 16,
+                fontSize: 12, lineHeight: 1.5,
+                background: testResult.ok ? 'rgba(52,199,89,0.1)' : 'rgba(255,69,58,0.1)',
+                color: testResult.ok ? '#34C759' : '#FF453A',
+                border: `1px solid ${testResult.ok ? 'rgba(52,199,89,0.3)' : 'rgba(255,69,58,0.3)'}`,
+              }}>
+                {testResult.msg}
+              </div>
+            )}
           </div>
 
           {/* Current status */}
