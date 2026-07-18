@@ -127,7 +127,7 @@ export const api = {
 
   // AI Settings
   getAiConfig: () => request<AiConfig>('/settings/ai'),
-  saveAiConfig: (cfg: { provider: string; api_key: string; model: string; embed_model: string }) =>
+  saveAiConfig: (cfg: { provider: string; api_key: string; model: string; embed_model: string; base_url?: string; embed_base_url?: string }) =>
     request<{ status: string; provider: string }>('/settings/ai', {
       method: 'PUT',
       body: JSON.stringify(cfg),
@@ -213,6 +213,8 @@ export interface AiConfig {
   has_key: boolean;
   model: string;
   embed_model: string;
+  base_url?: string;
+  embed_base_url?: string;
 }
 
 // ==================== WebSocket 协作 ====================

@@ -53,7 +53,12 @@ def create_provider() -> AIProvider:
         from .ai_openai import OpenAIProvider
         model = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
         embed_model = os.environ.get("OPENAI_EMBED_MODEL", "text-embedding-3-small")
-        return OpenAIProvider(api_key=api_key, model=model, embed_model=embed_model)
+        base_url = os.environ.get("OPENAI_BASE_URL", "")
+        embed_base_url = os.environ.get("OPENAI_EMBED_BASE_URL", "")
+        return OpenAIProvider(
+            api_key=api_key, model=model, embed_model=embed_model,
+            base_url=base_url, embed_base_url=embed_base_url,
+        )
 
     elif provider_name == "anthropic":
         api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -67,7 +72,8 @@ def create_provider() -> AIProvider:
 
         from .ai_anthropic import AnthropicProvider
         model = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
-        return AnthropicProvider(api_key=api_key, model=model)
+        base_url = os.environ.get("ANTHROPIC_BASE_URL", "")
+        return AnthropicProvider(api_key=api_key, model=model, base_url=base_url)
 
     # 默认：本地模式
     return LocalProvider()

@@ -135,6 +135,8 @@ class AiConfigModel(BaseModel):
     api_key: str = Field(default="")
     model: str = Field(default="")
     embed_model: str = Field(default="")
+    base_url: str = Field(default="")
+    embed_base_url: str = Field(default="")
 
 
 class AskRequest(BaseModel):
@@ -388,6 +390,13 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
                 os.environ["ANTHROPIC_MODEL"] = _saved_cfg["model"]
         if _saved_cfg.get("embed_model"):
             os.environ["OPENAI_EMBED_MODEL"] = _saved_cfg["embed_model"]
+        if _saved_cfg.get("base_url"):
+            if _saved_cfg["provider"] == "openai":
+                os.environ["OPENAI_BASE_URL"] = _saved_cfg["base_url"]
+            elif _saved_cfg["provider"] == "anthropic":
+                os.environ["ANTHROPIC_BASE_URL"] = _saved_cfg["base_url"]
+        if _saved_cfg.get("embed_base_url"):
+            os.environ["OPENAI_EMBED_BASE_URL"] = _saved_cfg["embed_base_url"]
     
     ai_provider = create_provider()
     
@@ -968,6 +977,8 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
             "has_key": bool(cfg.get("api_key") or os.environ.get("OPENAI_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")),
             "model": cfg.get("model", ""),
             "embed_model": cfg.get("embed_model", ""),
+            "base_url": cfg.get("base_url", ""),
+            "embed_base_url": cfg.get("embed_base_url", ""),
         }
     
     @app.put("/api/settings/ai", summary="保存 AI 配置")
@@ -978,6 +989,8 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
             "api_key": cfg.api_key,
             "model": cfg.model,
             "embed_model": cfg.embed_model,
+            "base_url": cfg.base_url,
+            "embed_base_url": cfg.embed_base_url,
         }
         # 保留现有 Key（如用户未输入新 Key）
         if not cfg.api_key:
@@ -994,11 +1007,17 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
                 os.environ["OPENAI_MODEL"] = cfg.model
             if cfg.embed_model:
                 os.environ["OPENAI_EMBED_MODEL"] = cfg.embed_model
+            if cfg.base_url:
+                os.environ["OPENAI_BASE_URL"] = cfg.base_url
+            if cfg.embed_base_url:
+                os.environ["OPENAI_EMBED_BASE_URL"] = cfg.embed_base_url
         elif cfg.provider == "anthropic":
             if cfg.api_key:
                 os.environ["ANTHROPIC_API_KEY"] = cfg.api_key
             if cfg.model:
                 os.environ["ANTHROPIC_MODEL"] = cfg.model
+            if cfg.base_url:
+                os.environ["ANTHROPIC_BASE_URL"] = cfg.base_url
         
         # 重新创建 provider
         nonlocal ai_provider
