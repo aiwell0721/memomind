@@ -70,14 +70,17 @@ docs-project/
 | 04 | [CLI工具设计](./04-detailed-design/04-CLI工具设计.md) | 命令行接口设计 |
 | 05 | [工具API设计](./04-detailed-design/05-工具API设计.md) | Tool API 详细规范 |
 | 06 | [数据模型设计](./04-detailed-design/06-数据模型设计.md) | 数据库模型 |
+| **07** | **[备注功能详细设计](./04-detailed-design/07-备注功能详细设计.md)** | **备注功能 API/前端/数据模型详细设计** |
 
 ## 第5类：产品开发计划 (`05-development-plan/`)
 
 | # | 文档 | 说明 |
 |---|------|------|
 | 01 | [Phase4开发计划](./05-development-plan/01-Phase4开发计划.md) | Phase 4 Web UI + 生产就绪 |
+| 02 | [下次优化方向](./05-development-plan/02-下次优化方向.md) | 后续优化方向（OPT-01 ~ OPT-08） |
 | 03 | [知识图谱连通与去重消化方案](./05-development-plan/03-知识图谱连通与去重消化方案.md) | KG连通 + 去重 + 知识消化 |
 | 04 | [记忆增强路线图-Dreaming与Skills](./05-development-plan/04-记忆增强路线图-Dreaming与Skills.md) | Phase 5 记忆增强开发计划（2026-07） |
+| **05** | **[备注功能开发计划](./05-development-plan/05-备注功能开发计划.md)** | **备注功能 Phase 1-5 开发计划** |
 
 ## 第6类：测试文档 (`06-test-docs/`)
 
