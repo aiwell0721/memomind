@@ -530,6 +530,37 @@ export default function NoteEditor() {
         </div>
       )}
 
+      {/* ═══ AI 推荐标签结果 ═══ */}
+      {aiTags && aiTags.length > 0 && (
+        <div className="card animate-slide-up" style={{ marginBottom: '1rem', padding: '1rem 1.5rem', borderLeft: '3px solid var(--success)' }}>
+          <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth="2" strokeLinecap="round">
+              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+              <line x1="7" y1="7" x2="7.01" y2="7" />
+            </svg>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>AI 推荐标签</span>
+            <button
+              className="btn-icon"
+              style={{ marginLeft: 'auto', width: 20, height: 20 }}
+              onClick={() => setAiTags(null)}
+              title="收起"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
+            {aiTags.map((tag, i) => (
+              <span key={i} className="tag">
+                <span className="tag-dot" style={{ background: ['#0071e3','#30b158','#f09824','#ee4b40'][i % 4] }} />
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ═══ AI 摘要卡片（持久化 + 可折叠） ═══ */}
       {(aiSummary || note?.ai_summary) && (note?.content?.length ?? 0) >= 100 && (
         <div className="card" style={{
@@ -611,37 +642,6 @@ export default function NoteEditor() {
         />
       )}
 
-
-      {/* ═══ AI 推荐标签结果 ═══ */}
-      {aiTags && aiTags.length > 0 && (
-        <div className="card animate-slide-up" style={{ marginTop: '1rem', padding: '1rem 1.5rem', borderLeft: '3px solid var(--success)' }}>
-          <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth="2" strokeLinecap="round">
-              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-              <line x1="7" y1="7" x2="7.01" y2="7" />
-            </svg>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>AI 推荐标签</span>
-            <button
-              className="btn-icon"
-              style={{ marginLeft: 'auto', width: 20, height: 20 }}
-              onClick={() => setAiTags(null)}
-              title="收起"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-          <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
-            {aiTags.map((tag, i) => (
-              <span key={i} className="tag">
-                <span className="tag-dot" style={{ background: ['#0071e3','#30b158','#f09824','#ee4b40'][i % 4] }} />
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* ═══ 备注区 ═══ */}
       {note && <AnnotationSection noteId={note.id} />}
