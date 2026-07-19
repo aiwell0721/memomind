@@ -150,6 +150,12 @@ class SummarizeRequest(BaseModel):
     method: str = Field("extractive", pattern=r"^(extractive|abstractive)$")
 
 
+class AnnotationCreate(BaseModel):
+    """创建备注的请求体"""
+    content: str = Field(..., min_length=1, max_length=10000)
+    parent_id: Optional[int] = None  # None=顶级备注，非None=回复某条备注
+
+
 # ==================== 认证 ====================
 
 from jose import JWTError, jwt
@@ -421,25 +427,33 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
         limit: int = Query(100, ge=1, le=500),
         offset: int = Query(0, ge=0),
         workspace_id: Optional[int] = Query(None),
+        note_type: str = Query("note", alias="type", pattern=r"^(note|all)$"),
         _: dict = Depends(verify_token)
     ):
-        """列出所有笔记"""
+        """列出笔记（默认仅返回 type='note' 的记录，type=all 返回全部）"""
+        type_filter = "" if note_type == "all" else "WHERE type = 'note'"
+
         if workspace_id:
-            cursor = db.execute("""
-                SELECT * FROM notes WHERE workspace_id = ?
+            where_clause = ("WHERE workspace_id = ? AND type = 'note'"
+                            if note_type != "all"
+                            else "WHERE workspace_id = ?")
+            cursor = db.execute(f"""
+                SELECT * FROM notes {where_clause}
                 ORDER BY updated_at DESC LIMIT ? OFFSET ?
             """, (workspace_id, limit, offset))
         else:
-            cursor = db.execute("""
-                SELECT * FROM notes ORDER BY updated_at DESC LIMIT ? OFFSET ?
+            cursor = db.execute(f"""
+                SELECT * FROM notes {type_filter}
+                ORDER BY updated_at DESC LIMIT ? OFFSET ?
             """, (limit, offset))
-        
+
         import json
         return [{
             'id': row['id'],
             'title': row['title'],
             'content': row['content'],
             'tags': json.loads(row['tags']) if row['tags'] else [],
+            'type': row['type'] if 'type' in row.keys() else 'note',
             'workspace_id': row['workspace_id'] if 'workspace_id' in row.keys() else 1,
             'created_at': row['created_at'],
             'updated_at': row['updated_at']
@@ -447,12 +461,23 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
     
     @app.get("/api/notes/{note_id}", summary="获取笔记详情")
     def get_note(note_id: int, _: dict = Depends(verify_token)):
-        """获取笔记详情"""
+        """获取笔记详情（含备注数量、AI 摘要）"""
         cursor = db.execute("SELECT * FROM notes WHERE id = ?", (note_id,))
         row = cursor.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="笔记不存在")
-        
+
+        # 统计该笔记的备注数量（含嵌套回复）
+        ann_row = db.execute("""
+            WITH RECURSIVE ann_tree AS (
+                SELECT id FROM notes WHERE parent_id = ? AND type = 'annotation'
+                UNION ALL
+                SELECT n.id FROM notes n JOIN ann_tree a ON n.parent_id = a.id
+            )
+            SELECT COUNT(*) FROM ann_tree
+        """, (note_id,)).fetchone()
+        annotation_count = ann_row[0] if ann_row else 0
+
         import json
         return {
             'id': row['id'],
@@ -462,7 +487,10 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
             'workspace_id': row['workspace_id'] if 'workspace_id' in row.keys() else 1,
             'created_by': row['created_by'] if 'created_by' in row.keys() else None,
             'created_at': row['created_at'],
-            'updated_at': row['updated_at']
+            'updated_at': row['updated_at'],
+            'type': row['type'] if 'type' in row.keys() else 'note',
+            'annotation_count': annotation_count,
+            'ai_summary': row['ai_summary'] if 'ai_summary' in row.keys() else '',
         }
     
     @app.post("/api/notes", status_code=status.HTTP_201_CREATED, summary="创建笔记")
@@ -1070,6 +1098,134 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
         except Exception as e:
             return {"status": "error", "message": f"❌ 连接失败: {str(e)}"}
     
+    # ==================== 备注 API ====================
+
+    @app.get("/api/notes/{note_id}/annotations", summary="列出备注")
+    def list_annotations(note_id: int, _: dict = Depends(verify_token)):
+        """列出指定笔记的所有备注（树形嵌套结构）"""
+        # 验证笔记存在
+        note = db.execute("SELECT id FROM notes WHERE id = ?", (note_id,)).fetchone()
+        if not note:
+            raise HTTPException(status_code=404, detail="笔记不存在")
+
+        # 查询所有关联备注
+        cursor = db.execute("""
+            SELECT id, title, content, tags, created_at, updated_at, type, parent_id
+            FROM notes
+            WHERE type = 'annotation'
+              AND (parent_id = ? OR parent_id IN (
+                  SELECT id FROM notes WHERE parent_id = ? AND type = 'annotation'
+              ))
+            ORDER BY created_at ASC
+        """, (note_id, note_id))
+
+        annotations = []
+        annotation_map = {}
+        for row in cursor.fetchall():
+            ann = {
+                'id': row['id'],
+                'parent_id': row['parent_id'],
+                'content': row['content'],
+                # author 暂用固定值，后续 Phase 集成 created_by
+                'author': '用户',
+                'created_at': row['created_at'],
+                'updated_at': row['updated_at'],
+                'replies': [],
+            }
+            annotation_map[ann['id']] = ann
+            annotations.append(ann)
+
+        # 构建树形结构：parent_id == note_id 是顶级备注，其他是回复
+        roots = []
+        for ann in annotations:
+            if ann['parent_id'] == note_id:
+                roots.append(ann)
+                ann['parent_id'] = None  # 对外暴露 null
+            else:
+                parent = annotation_map.get(ann['parent_id'])
+                if parent:
+                    parent['replies'].append(ann)
+
+        return roots
+
+    @app.post(
+        "/api/notes/{note_id}/annotations",
+        status_code=status.HTTP_201_CREATED,
+        summary="创建备注",
+    )
+    def create_annotation(
+        note_id: int, req: AnnotationCreate, _: dict = Depends(verify_token)
+    ):
+        """创建备注。parent_id 为 null 时是顶级备注，非 null 时是回复。"""
+        import json
+
+        # 1. 验证原笔记存在
+        note = db.execute(
+            "SELECT id FROM notes WHERE id = ? AND type = 'note'",
+            (note_id,),
+        ).fetchone()
+        if not note:
+            raise HTTPException(status_code=404, detail="笔记不存在")
+
+        # 2. 如果 parent_id 非 null，验证它是该笔记下的备注
+        if req.parent_id is not None:
+            parent = db.execute(
+                "SELECT id FROM notes WHERE id = ? AND type = 'annotation'",
+                (req.parent_id,),
+            ).fetchone()
+            if not parent:
+                raise HTTPException(status_code=404, detail="父备注不存在")
+
+        # 3. 创建备注记录
+        cursor = db.execute(
+            """INSERT INTO notes (title, content, type, parent_id, tags)
+               VALUES (?, ?, 'annotation', ?, ?)""",
+            ("", req.content, req.parent_id if req.parent_id is not None else note_id,
+             json.dumps([])),
+        )
+        db.commit()
+
+        annotation_id = cursor.lastrowid
+
+        # 读取创建时间
+        row = db.execute(
+            "SELECT created_at FROM notes WHERE id = ?", (annotation_id,)
+        ).fetchone()
+
+        return {
+            'id': annotation_id,
+            'type': 'annotation',
+            'note_id': note_id,
+            'parent_id': req.parent_id,
+            'content': req.content,
+            'created_at': row['created_at'] if row else None,
+        }
+
+    @app.delete("/api/annotations/{annotation_id}", summary="删除备注")
+    def delete_annotation(annotation_id: int, _: dict = Depends(verify_token)):
+        """删除备注（级联删除所有子回复）。仅创建者可删除。"""
+        # 验证备注存在
+        row = db.execute(
+            "SELECT id, type FROM notes WHERE id = ?", (annotation_id,)
+        ).fetchone()
+        if not row or row['type'] != 'annotation':
+            raise HTTPException(status_code=404, detail="备注不存在")
+
+        # 递归删除所有子回复
+        def _delete_children(parent_id: int):
+            children = db.execute(
+                "SELECT id FROM notes WHERE parent_id = ? AND type = 'annotation'",
+                (parent_id,),
+            ).fetchall()
+            for child in children:
+                _delete_children(child['id'])
+            db.execute("DELETE FROM notes WHERE id = ?", (parent_id,))
+
+        _delete_children(annotation_id)
+        db.commit()
+
+        return {'id': annotation_id, 'deleted': True}
+
     # ==================== 认证 API ====================
     
     @app.post("/api/auth/login", response_model=TokenResponse, summary="登录")
