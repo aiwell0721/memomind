@@ -47,7 +47,7 @@ export const api = {
   getNote: (id: number) => request<Note>(`/notes/${id}`),
   createNote: (data: { title: string; content: string; tags?: string[]; workspace_id?: number }) =>
     request<Note>('/notes', { method: 'POST', body: JSON.stringify(data) }),
-  updateNote: (id: number, data: { title?: string; content?: string; tags?: string[] }) =>
+  updateNote: (id: number, data: { title?: string; content?: string; tags?: string[]; ai_summary?: string | null }) =>
     request<Note>(`/notes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteNote: (id: number) => request(`/notes/${id}`, { method: 'DELETE' }),
   searchNotes: (query: string, tags?: string[], limit = 20) =>
@@ -154,6 +154,19 @@ export const api = {
     request<{ note_id: number; tags: string[] }>(`/tags/auto/${noteId}`, {
       method: 'POST',
     }),
+
+  // Annotation API
+  getAnnotations: (noteId: number) =>
+    request<Annotation[]>(`/notes/${noteId}/annotations`),
+  createAnnotation: (noteId: number, content: string, parent_id?: number) =>
+    request<Annotation>(`/notes/${noteId}/annotations`, {
+      method: 'POST',
+      body: JSON.stringify({ content, parent_id }),
+    }),
+  deleteAnnotation: (annotationId: number) =>
+    request<{ id: number; deleted: boolean }>(`/annotations/${annotationId}`, {
+      method: 'DELETE',
+    }),
 };
 
 // Types
@@ -165,6 +178,7 @@ export interface Note {
   workspace_id: number;
   created_at: string;
   updated_at: string;
+  ai_summary?: string | null;
 }
 
 export interface SearchResult {
@@ -237,6 +251,16 @@ export interface AiConfig {
   embed_model: string;
   base_url?: string;
   embed_base_url?: string;
+}
+
+export interface Annotation {
+  id: number;
+  parent_id: number | null;
+  content: string;
+  author: string;
+  created_at: string;
+  updated_at: string;
+  replies: Annotation[];
 }
 
 // ==================== WebSocket 协作 ====================

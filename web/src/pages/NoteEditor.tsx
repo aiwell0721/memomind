@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { marked } from 'marked';
 import { api } from '../lib/api';
 import type { Note, Version, Collaborator } from '../lib/api';
+import AnnotationSection from '../components/AnnotationSection';
 import { createWsClient } from '../lib/api';
 import { toast } from '../App';
 
@@ -77,6 +78,7 @@ export default function NoteEditor() {
   const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
   const [aiTags, setAiTags] = useState<string[] | null>(null);
   const [aiTagsLoading, setAiTagsLoading] = useState(false);
+  const [showSummary, setShowSummary] = useState(true);
 
   const wsRef = useRef<ReturnType<typeof createWsClient> | null>(null);
   const isLocalEdit = useRef(false);
@@ -92,6 +94,12 @@ export default function NoteEditor() {
       setEditTitle(data.title);
       setEditContent(data.content);
       setEditTags(data.tags.join(', '));
+      if (data.ai_summary) {
+        setAiSummary(data.ai_summary);
+        setShowSummary(true);
+      } else {
+        setAiSummary(null);
+      }
       api.versions(Number(id), 10).then(setVersions).catch(() => {});
       api.incomingLinks(Number(id)).then(setIncomingLinks).catch(() => {});
       setError('');
@@ -438,6 +446,8 @@ export default function NoteEditor() {
                 try {
                   const res = await api.summarizeNote(note.id);
                   setAiSummary(res.summary);
+                  await api.updateNote(note.id, { ai_summary: res.summary });
+                  setNote({ ...note, ai_summary: res.summary });
                 } catch (err) {
                   toast(err instanceof Error ? err.message : '摘要生成失败', 'error');
                 } finally { setAiSummaryLoading(false); }
@@ -520,6 +530,65 @@ export default function NoteEditor() {
         </div>
       )}
 
+      {/* ═══ AI 摘要卡片（持久化 + 可折叠） ═══ */}
+      {(aiSummary || note?.ai_summary) && (note?.content?.length ?? 0) >= 100 && (
+        <div className="card" style={{
+          marginBottom: '1rem', padding: '1.25rem 1.5rem',
+          borderLeft: '3px solid var(--accent)'
+        }}>
+          <div className="flex items-center gap-2" style={{ marginBottom: showSummary ? 8 : 0 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>📝 AI 摘要</span>
+            <button
+              className="btn-icon"
+              style={{ marginLeft: 'auto', width: 20, height: 20 }}
+              onClick={() => setShowSummary(!showSummary)}
+              title={showSummary ? '收起' : '展开'}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                {showSummary ? (
+                  <polyline points="18 15 12 9 6 15" />
+                ) : (
+                  <polyline points="6 9 12 15 18 9" />
+                )}
+              </svg>
+            </button>
+            <button
+              className="btn-icon"
+              style={{ width: 20, height: 20 }}
+              onClick={async () => {
+                if (!note) return;
+                setAiSummaryLoading(true);
+                try {
+                  const res = await api.summarizeNote(note.id);
+                  setAiSummary(res.summary);
+                  await api.updateNote(note.id, { ai_summary: res.summary });
+                  setNote({ ...note, ai_summary: res.summary });
+                  setShowSummary(true);
+                } catch (err) {
+                  toast(err instanceof Error ? err.message : '摘要生成失败', 'error');
+                } finally { setAiSummaryLoading(false); }
+              }}
+              disabled={aiSummaryLoading}
+              title="重新生成"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+            </button>
+          </div>
+          {showSummary && (
+            <p style={{ fontSize: '0.9375rem', lineHeight: 1.75, color: 'var(--apple-text)', margin: 0, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+              {aiSummary || note?.ai_summary}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* ═══ Content Area ═══ */}
       {editMode ? (
         <textarea
@@ -542,31 +611,6 @@ export default function NoteEditor() {
         />
       )}
 
-      {/* ═══ AI 摘要结果 ═══ */}
-      {aiSummary && (
-        <div className="card animate-slide-up" style={{ marginTop: '1rem', padding: '1.25rem 1.5rem', borderLeft: '3px solid var(--accent)' }}>
-          <div className="flex items-center gap-2" style={{ marginBottom: 8 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>AI 摘要</span>
-            <button
-              className="btn-icon"
-              style={{ marginLeft: 'auto', width: 20, height: 20 }}
-              onClick={() => setAiSummary(null)}
-              title="收起"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-          <p style={{ fontSize: '0.9375rem', lineHeight: 1.75, color: 'var(--apple-text)', margin: 0, overflowWrap: 'break-word', wordBreak: 'break-word' }}>
-            {aiSummary}
-          </p>
-        </div>
-      )}
 
       {/* ═══ AI 推荐标签结果 ═══ */}
       {aiTags && aiTags.length > 0 && (
@@ -598,6 +642,9 @@ export default function NoteEditor() {
           </div>
         </div>
       )}
+
+      {/* ═══ 备注区 ═══ */}
+      {note && <AnnotationSection noteId={note.id} />}
 
       {/* ═══ Incoming Links ═══ */}
       {incomingLinks.length > 0 && (
