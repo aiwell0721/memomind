@@ -297,7 +297,7 @@ export default function Dashboard() {
                 </svg>
               </span>
               <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.02em', whiteSpace: 'nowrap' }}>
-                MemoMind
+                MemoMind{import.meta.env.DEV && <span style={{fontWeight:400, fontSize:11, opacity:.5}}>(Dev)</span>}
               </span>
               {health && (
                 <span style={{
