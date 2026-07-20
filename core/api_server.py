@@ -465,7 +465,7 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
         return [{
             'id': row['id'],
             'title': row['title'],
-            'content': row['content'],
+            'content': row['content'][:200] + '...' if len(row['content']) > 200 else row['content'],
             'tags': json.loads(row['tags']) if row['tags'] else [],
             'type': row['type'] if 'type' in row.keys() else 'note',
             'workspace_id': row['workspace_id'] if 'workspace_id' in row.keys() else 1,
