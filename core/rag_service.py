@@ -99,19 +99,21 @@ class RAGService:
         max_length: int
     ) -> Tuple[str, List[Dict]]:
         """
-        构建回答上下文
-        
+        构建回答上下文（原文 + 备注信息）
+
         Returns:
             (上下文字符串, 来源列表)
         """
         context_parts = []
         sources = []
         current_length = 0
-        
+        note_ids = []
+
         for result in results:
             note = result.note
+            note_ids.append(note.id)
             snippet = self._extract_snippet(note.content, 300)
-            
+
             source = {
                 'note_id': note.id,
                 'title': note.title,
@@ -119,18 +121,57 @@ class RAGService:
                 'score': result.score
             }
             sources.append(source)
-            
+
             context_part = f"【{note.title}】\n{note.content[:500]}"
             if len(note.content) > 500:
                 context_part += "..."
-            
+
             if current_length + len(context_part) > max_length:
                 break
-            
+
             context_parts.append(context_part)
             current_length += len(context_part)
-        
+
+        # 追加备注信息：将关联笔记的备注内容附加到上下文末尾
+        if note_ids:
+            annotations = self._fetch_annotations(note_ids, max_length)
+            if annotations:
+                context_parts.append(annotations)
+
         return "\n\n".join(context_parts), sources
+
+    def _fetch_annotations(
+        self, note_ids: List[int], max_length: int
+    ) -> str:
+        """获取关联笔记的备注内容，追加在上下文末尾。
+
+        备注放在原文之后，AI 自然会对后出现的内容给予更多关注，
+        间接实现了「备注比原文更重要」的效果。
+        """
+        placeholders = ",".join("?" for _ in note_ids)
+        cursor = self.db.execute(f"""
+            SELECT content FROM notes
+            WHERE parent_id IN ({placeholders}) AND type = 'annotation'
+            ORDER BY created_at ASC
+        """, tuple(note_ids))
+
+        rows = cursor.fetchall()
+        if not rows:
+            return ""
+
+        parts = ["【备注信息】"]
+        total = 0
+        for row in rows:
+            content = row[0]
+            if not content:
+                continue
+            line = f"• {content[:200]}"
+            if total + len(line) > max_length // 4:  # 备注最多占 1/4 上下文
+                break
+            parts.append(line)
+            total += len(line)
+
+        return "\n".join(parts) if len(parts) > 1 else ""
     
     def _extract_snippet(self, content: str, max_length: int) -> str:
         """提取内容片段"""

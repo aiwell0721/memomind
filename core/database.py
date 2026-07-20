@@ -109,8 +109,32 @@ class Database:
             )
         """)
 
+        # 备注功能支持（v2.1.0）
+        try:
+            cursor.execute("ALTER TABLE notes ADD COLUMN type TEXT NOT NULL DEFAULT 'note'")
+        except sqlite3.OperationalError:
+            pass  # 已迁移
+        try:
+            cursor.execute("ALTER TABLE notes ADD COLUMN parent_id INTEGER REFERENCES notes(id)")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_notes_type ON notes(type)")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_notes_parent ON notes(parent_id)")
+        except sqlite3.OperationalError:
+            pass
+
+        # AI 摘要持久化
+        try:
+            cursor.execute("ALTER TABLE notes ADD COLUMN ai_summary TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+
         self.conn.commit()
-    
+
     # SQL 写操作的正则：只匹配 notes 主表（含可选 schema 前缀），排除 notes_fts、
     # note_versions、note_tags、note_links 等同前缀表。\b 保证 'notes' 是完整词。
     _RE_INSERT_NOTES = re.compile(r"^\s*INSERT\s+(?:OR\s+\w+\s+)?INTO\s+notes\b(?!_)", re.IGNORECASE)
