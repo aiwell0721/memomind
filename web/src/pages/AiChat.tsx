@@ -85,12 +85,12 @@ export default function AiChat() {
                 fontSize: 11, fontWeight: 600,
                 background: msg.role === 'user'
                   ? 'rgba(0,0,0,0.06)'
-                  : 'linear-gradient(135deg, var(--accent), #40a4ff)',
+                  : 'linear-gradient(135deg, var(--apple-accent), #40a4ff)',
                 color: msg.role === 'user' ? 'var(--apple-text)' : '#fff',
               }}>
                 {msg.role === 'user' ? '你' : 'AI'}
               </div>
-              <span style={{ fontSize: 11, fontWeight: 600, color: msg.role === 'user' ? 'var(--apple-text)' : 'var(--accent)' }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: msg.role === 'user' ? 'var(--apple-text)' : 'var(--apple-accent)' }}>
                 {msg.role === 'user' ? '你' : 'AI 助手'}
               </span>
             </div>
@@ -124,7 +124,7 @@ export default function AiChat() {
             <div style={{
               width: 20, height: 20, borderRadius: '50%',
               border: '2px solid var(--apple-border)',
-              borderTopColor: 'var(--accent)',
+              borderTopColor: 'var(--apple-accent)',
               animation: 'spin 0.6s linear infinite',
             }} />
             <span style={{ fontSize: 12, color: 'var(--apple-text-tertiary)' }}>思考中...</span>

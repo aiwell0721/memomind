@@ -127,8 +127,8 @@ export default function AnnotationSection({ noteId }: AnnotationSectionProps) {
           {/* 头像：首字母圆圈 */}
           <div style={{
             width: 28, height: 28, borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--accent-light), var(--accent-lighter))',
-            color: 'var(--accent)',
+            background: 'linear-gradient(135deg, var(--apple-accent-light), var(--apple-accent-lighter))',
+            color: 'var(--apple-accent)',
             fontSize: 12, fontWeight: 600,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0, marginTop: 2,
@@ -161,7 +161,7 @@ export default function AnnotationSection({ noteId }: AnnotationSectionProps) {
                   fontSize: 11, color: 'var(--apple-text-tertiary)',
                   background: 'none', border: 'none', cursor: 'pointer', padding: 0,
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent)'; }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--apple-accent)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--apple-text-tertiary)'; }}
               >
                 回复

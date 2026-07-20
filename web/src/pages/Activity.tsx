@@ -9,12 +9,12 @@ import type { ActivityLog } from '../lib/api';
 
 const actionConfig: Record<string, { label: string; color: string; icon: string }> = {
   create:             { label: '创建了笔记',     color: 'var(--success)', icon: 'create' },
-  update:             { label: '更新了笔记',     color: 'var(--accent)',  icon: 'update' },
+  update:             { label: '更新了笔记',     color: 'var(--apple-accent)',  icon: 'update' },
   delete:             { label: '删除了笔记',     color: 'var(--danger)',  icon: 'delete' },
   search:             { label: '搜索了笔记',     color: 'var(--apple-text-tertiary)', icon: 'search' },
   login:              { label: '登录了系统',     color: 'var(--warning)', icon: 'login' },
   workspace_create:   { label: '创建了工作区',   color: 'var(--success)', icon: 'workspace' },
-  workspace_update:   { label: '更新了工作区',   color: 'var(--accent)',  icon: 'workspace' },
+  workspace_update:   { label: '更新了工作区',   color: 'var(--apple-accent)',  icon: 'workspace' },
   workspace_delete:   { label: '删除了工作区',   color: 'var(--danger)',  icon: 'workspace' },
 };
 
@@ -169,8 +169,8 @@ export default function Activity() {
             style={{
               padding: '2px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500,
               border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-              background: limit === n ? 'var(--accent-light)' : 'transparent',
-              color: limit === n ? 'var(--accent)' : 'var(--apple-text-secondary)',
+              background: limit === n ? 'var(--apple-accent-light)' : 'transparent',
+              color: limit === n ? 'var(--apple-accent)' : 'var(--apple-text-secondary)',
             }}
           >
             {n}

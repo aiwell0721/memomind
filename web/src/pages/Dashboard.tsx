@@ -129,7 +129,7 @@ function WorkspaceDropdown({
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {selectedWs ? (
             <span className="flex items-center gap-2">
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--apple-accent)', flexShrink: 0 }} />
               {selectedWs.name}
             </span>
           ) : (
@@ -179,8 +179,8 @@ function WorkspaceDropdown({
               onClick={() => { onChange(null); setOpen(false); }}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                padding: '6px 10px', border: 'none', background: !selected ? 'var(--accent-light)' : 'transparent',
-                color: !selected ? 'var(--accent)' : 'var(--apple-text-secondary)',
+                padding: '6px 10px', border: 'none', background: !selected ? 'var(--apple-accent-light)' : 'transparent',
+                color: !selected ? 'var(--apple-accent)' : 'var(--apple-text-secondary)',
                 fontSize: 12, fontWeight: !selected ? 600 : 400, cursor: 'pointer',
                 fontFamily: 'inherit', textAlign: 'left',
               }}
@@ -194,13 +194,13 @@ function WorkspaceDropdown({
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 8,
                   padding: '6px 10px', border: 'none',
-                  background: selected === ws.id ? 'var(--accent-light)' : 'transparent',
-                  color: selected === ws.id ? 'var(--accent)' : 'var(--apple-text)',
+                  background: selected === ws.id ? 'var(--apple-accent-light)' : 'transparent',
+                  color: selected === ws.id ? 'var(--apple-accent)' : 'var(--apple-text)',
                   fontSize: 12, fontWeight: selected === ws.id ? 600 : 400,
                   cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
                 }}
               >
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--apple-accent)', flexShrink: 0 }} />
                 {ws.name}
                 {ws.note_count !== undefined && (
                   <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--apple-text-tertiary)' }}>
@@ -421,7 +421,7 @@ export default function Dashboard() {
               {/* Avatar */}
               <div style={{
                 width: 26, height: 26, borderRadius: '50%',
-                background: 'linear-gradient(135deg, var(--accent), #40a4ff)',
+                background: 'linear-gradient(135deg, var(--apple-accent), #40a4ff)',
                 color: 'white', fontSize: 11, fontWeight: 600,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0,

@@ -34,7 +34,7 @@ type ViewMode = 'preview' | 'raw';
 /* ── Action color mapping ── */
 const actionColors: Record<string, string> = {
   create: 'var(--success)',
-  update: 'var(--accent)',
+  update: 'var(--apple-accent)',
   manual_save: 'var(--warning)',
 };
 
@@ -254,8 +254,8 @@ export default function NoteEditor() {
                 <div key={u.user_id} style={{ position: 'relative' }} title={u.username}>
                   <span style={{
                     width: 28, height: 28, borderRadius: '50%',
-                    background: 'linear-gradient(135deg, var(--accent-light), var(--accent-lighter))',
-                    color: 'var(--accent)', fontSize: 11, fontWeight: 600,
+                    background: 'linear-gradient(135deg, var(--apple-accent-light), var(--apple-accent-lighter))',
+                    color: 'var(--apple-accent)', fontSize: 11, fontWeight: 600,
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   }}>
                     {u.username.charAt(0).toUpperCase()}
@@ -312,7 +312,7 @@ export default function NoteEditor() {
 
       {/* ── Remote edit toast ── */}
       {remoteEdit && (
-        <div style={{ marginBottom: 12, padding: '0.5rem 1rem', background: 'var(--accent-light)', borderRadius: 8, color: 'var(--accent)', fontSize: 13, animation: 'slideUp 0.2s var(--ease-spring)' }}>
+        <div style={{ marginBottom: 12, padding: '0.5rem 1rem', background: 'var(--apple-accent-light)', borderRadius: 8, color: 'var(--apple-accent)', fontSize: 13, animation: 'slideUp 0.2s var(--ease-spring)' }}>
           协作者已更新内容
         </div>
       )}
@@ -439,7 +439,7 @@ export default function NoteEditor() {
             {/* AI 操作按钮 */}
             <button
               className="btn btn-ghost btn-sm"
-              style={{ fontSize: 12, color: 'var(--accent)' }}
+              style={{ fontSize: 12, color: 'var(--apple-accent)' }}
               onClick={async () => {
                 if (!note) return;
                 setAiSummaryLoading(true); setAiSummary(null);
@@ -565,14 +565,14 @@ export default function NoteEditor() {
       {(aiSummary || note?.ai_summary) && (note?.content?.length ?? 0) >= 100 && (
         <div className="card" style={{
           marginBottom: '1rem', padding: '1.25rem 1.5rem',
-          borderLeft: '3px solid var(--accent)'
+          borderLeft: '3px solid var(--apple-accent)'
         }}>
           <div className="flex items-center gap-2" style={{ marginBottom: showSummary ? 8 : 0 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--apple-accent)" strokeWidth="2" strokeLinecap="round">
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>📝 AI 摘要</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--apple-accent)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>📝 AI 摘要</span>
             <button
               className="btn-icon"
               style={{ marginLeft: 'auto', width: 20, height: 20 }}
@@ -660,7 +660,7 @@ export default function NoteEditor() {
             {incomingLinks.slice(0, 10).map((link, i) => {
               const l = link as Record<string, unknown>;
               return (
-                <span key={i} style={{ display: 'block', fontSize: 13, color: 'var(--accent)', cursor: 'pointer', padding: '0.375rem 0' }}>
+                <span key={i} style={{ display: 'block', fontSize: 13, color: 'var(--apple-accent)', cursor: 'pointer', padding: '0.375rem 0' }}>
                   → {String(l.source_title || '笔记')}
                 </span>
               );

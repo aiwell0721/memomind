@@ -270,7 +270,7 @@ export default function Settings() {
       )}
       {/* ── Success ── */}
       {success && (
-        <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', background: 'rgba(52,199,89,0.1)', borderRadius: 10, color: 'var(--accent)', fontSize: 13 }}>
+        <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', background: 'rgba(52,199,89,0.1)', borderRadius: 10, color: 'var(--apple-accent)', fontSize: 13 }}>
           {success}
         </div>
       )}
@@ -288,8 +288,8 @@ export default function Settings() {
             {tab.count !== undefined && (
               <span style={{
                 fontSize: 10, fontWeight: 600, marginLeft: 2,
-                background: activeTab === tab.id ? 'var(--accent-light)' : 'rgba(0,0,0,0.06)',
-                color: activeTab === tab.id ? 'var(--accent)' : 'var(--apple-text-secondary)',
+                background: activeTab === tab.id ? 'var(--apple-accent-light)' : 'rgba(0,0,0,0.06)',
+                color: activeTab === tab.id ? 'var(--apple-accent)' : 'var(--apple-text-secondary)',
                 borderRadius: 8, padding: '0 6px', minWidth: 20, textAlign: 'center',
               }}>
                 {tab.count}
@@ -405,8 +405,8 @@ export default function Settings() {
                       <div className="flex items-center gap-2">
                         <span style={{
                           width: 26, height: 26, borderRadius: '50%',
-                          background: 'linear-gradient(135deg, var(--accent-light), var(--accent-lighter))',
-                          color: 'var(--accent)', fontSize: 11, fontWeight: 600,
+                          background: 'linear-gradient(135deg, var(--apple-accent-light), var(--apple-accent-lighter))',
+                          color: 'var(--apple-accent)', fontSize: 11, fontWeight: 600,
                           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                         }}>
                           {user.username.charAt(0).toUpperCase()}
@@ -471,7 +471,7 @@ export default function Settings() {
                 >
                   <div style={{ minWidth: 0 }}>
                     <div className="flex items-center gap-2">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--apple-accent)" strokeWidth="1.8" strokeLinecap="round">
                         <ellipse cx="12" cy="5" rx="9" ry="3" />
                         <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
                         <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />

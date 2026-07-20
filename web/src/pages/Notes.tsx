@@ -306,7 +306,7 @@ export default function Notes() {
               {/* Left accent stripe */}
               <div style={{
                 position: 'absolute', left: 0, top: 0, bottom: 0,
-                width: 3, background: 'var(--accent)',
+                width: 3, background: 'var(--apple-accent)',
                 opacity: 0, transition: 'opacity 0.2s',
                 borderRadius: '3px 0 0 3px',
               }}
