@@ -235,15 +235,15 @@ def generate_token(username: str) -> str:
 
 # ==================== 应用初始化 ====================
 
-def create_app(db_path: str = "~/memomind.db") -> FastAPI:
+def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
     """
     创建 FastAPI 应用
 
     数据库路径优先级：
     1. 环境变量 MEMOMIND_DB_PATH
-    2. 函数参数 db_path（默认 ~/memomind.db）
+    2. 函数参数 db_path（默认 ~/.memomind/memomind.db）
 
-    Prod: 不设环境变量，数据库在 ~/memomind.db
+    Prod: 不设环境变量，数据库在 ~/.memomind/memomind.db
     Dev:  export MEMOMIND_DB_PATH=memomind.db
     """
     db_path = os.environ.get("MEMOMIND_DB_PATH", db_path)

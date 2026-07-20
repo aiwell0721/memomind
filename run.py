@@ -44,10 +44,10 @@ def main():
     if env_db:
         db_path = env_db
     elif _frozen:
-        # ── Prod 模式（.exe）→ ~/memomind.db ──
+        # ── Prod 模式（.exe）→ ~/.memomind/memomind.db ──
         _exe_dir = os.path.dirname(sys.executable)
-        _target_path = str(Path.home() / "memomind.db")
-        _target_dir = str(Path.home())
+        _target_path = str(Path.home() / ".memomind" / "memomind.db")
+        _target_dir = str(Path.home() / ".memomind")
 
         if os.path.isfile(_target_path):
             db_path = _target_path
@@ -56,10 +56,10 @@ def main():
             # 旧路径迁移（按优先级搜索）：
             #   1) exe 同级 data/memomind.db
             #   2) exe 同级 memomind.db
-            #   3) ~/.memomind/memomind.db（v2.0 旧位置）
+            #   3) ~/memomind.db（v3.0 旧默认位置，统一前）
             _old_data_db = os.path.join(_exe_dir, "data", "memomind.db")
             _old_root_db = os.path.join(_exe_dir, "memomind.db")
-            _old_dotmemomind_db = str(Path.home() / ".memomind" / "memomind.db")
+            _old_home_db = str(Path.home() / "memomind.db")
             _src = None
             _src_label = None
             if os.path.isfile(_old_data_db):
@@ -68,9 +68,9 @@ def main():
             elif os.path.isfile(_old_root_db):
                 _src = _old_root_db
                 _src_label = "memomind.db (exe 同级)"
-            elif os.path.isfile(_old_dotmemomind_db):
-                _src = _old_dotmemomind_db
-                _src_label = "~/.memomind/memomind.db (v2.0)"
+            elif os.path.isfile(_old_home_db):
+                _src = _old_home_db
+                _src_label = "~/memomind.db (v3.0 旧默认)"
 
             if _src:
                 import shutil
