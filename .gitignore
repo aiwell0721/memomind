@@ -49,6 +49,7 @@ logs/
 web/test-results/
 
 # Stitch design artifacts (generated)
+.stitch/
 web/stitch-output/
 web/stitch-backup/
 
