@@ -27,7 +27,7 @@
 | ✅ 5.0 | TF-IDF 聚类验证实验 | 已完成 | 🔴 P0 | — |
 | ✅ 5.1 | 基准测试框架 | 已完成 | 🔴 P0 | 无 |
 | ✅ 5.2 | Dreaming 基础（Embedding 聚类） | 已完成 | 🔴 P0 | 5.0, 5.1 |
-| 5.3 | Dreaming 增强 | 2-3 天 | 🟡 P1 | 5.2 |
+| 🟡 5.3 | Dreaming 增强 | 进行中 | 🟡 P1 | 5.2 |
 | ⏸️ | Skills 模式识别 | — | 观察项 | 埋点数据达标后启动 |
 | ⏸️ | Skills 自动进化 | — | 观察项 | Skills 模式识别 |
 
@@ -161,32 +161,37 @@ memomind dream history            # 查看 Dreaming 历史
 
 **目标**：在基础 Dreaming 之上增加知识提纯和定时触发
 
+**状态**（2026-07-20）：REST API + 调度器 + 前端面板已完成，知识提纯模块待后续 PR。
+
 #### 交付物
 
-| # | 交付物 | 说明 |
-|---|--------|------|
-| 1 | `core/dreaming_extractor.py` | 知识提纯模块 |
-| 2 | `core/dreaming_scheduler.py` | 定时触发器 |
-| 3 | API：`POST /api/dreaming/trigger` | REST API 触发 |
-| 4 | API：`GET /api/dreaming/sessions` | 查看历史 |
-| 5 | API：`POST /api/dreaming/rollback/{id}` | API 回滚 |
-| 6 | 前端：Dreaming 面板 | Web UI 中查看 Dreaming 历史和报告 |
+| # | 交付物 | 说明 | 状态 |
+|---|--------|------|------|
+| 1 | `core/dreaming_extractor.py` | 知识提纯模块 | ⏸️ 后续 PR |
+| 2 | `core/dreaming_scheduler.py` | 定时触发器 | ✅ 已完成 |
+| 3 | API：`POST /api/dreaming/run` | REST API 触发 | ✅ 已完成 |
+| 4 | API：`GET /api/dreaming/history` | 查看历史 | ✅ 已完成 |
+| 5 | API：`POST /api/dreaming/{id}/rollback` | API 回滚 | ✅ 已完成 |
+| 6 | API：`GET /api/dreaming/{id}/changes` | 变更详情 | ✅ 已完成 |
+| 7 | 前端：Dreaming 面板 | Web UI 管理 Dreaming | ✅ 已完成 |
+| 8 | `benchmarks/dreaming_benchmark.py` | 基准测试接入 | ✅ 已完成 |
 
 #### 增强功能
 
-- **知识提纯**：从记忆簇中提取 (subject, predicate, object) 三元组
-- **AI 增强**：Cloud AI Provider 模式下，使用 LLM 生成更好的合并摘要
-- **定时触发**：每日凌晨 3:00 自动执行（可配置）
-- **阈值触发**：记忆数 > 500 且上次 Dreaming > 7 天时自动触发
-- **报告生成**：每次 Dreaming 产出结构化报告
+- **知识提纯**：从记忆簇中提取 (subject, predicate, object) 三元组 ⏸️
+- **AI 增强**：Cloud AI Provider 模式下，使用 LLM 生成更好的合并摘要 ⏸️
+- **定时触发**：每日凌晨 3:00 自动执行（通过 `MEMOMIND_SCHEDULE=1` 启用）✅
+- **阈值触发**：记忆数 > 500 且上次 Dreaming > 7 天时自动触发 ⏸️
+- **报告生成**：每次 Dreaming 产出结构化报告 ✅
 
 #### 成功标准
 
-- ✅ 知识提纯能从 10 条记忆中提取 ≥ 5 个有效三元组
+- ⏸️ 知识提纯能从 10 条记忆中提取 ≥ 5 个有效三元组
 - ✅ 定时触发正确执行（测试模拟）
-- ✅ REST API 接口完整
+- ✅ REST API 接口完整（4 个端点）
 - ✅ 前端可查看 Dreaming 历史和报告
-- ✅ ≥ 10 个新测试通过
+- ✅ 13 个新测试通过（tests/test_dreaming_api.py）
+- ✅ 基准测试 Dreaming 压缩率 36.7%（≥ 20% 目标）
 
 ---
 

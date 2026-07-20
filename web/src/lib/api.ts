@@ -167,6 +167,19 @@ export const api = {
     request<{ id: number; deleted: boolean }>(`/annotations/${annotationId}`, {
       method: 'DELETE',
     }),
+
+  // Dreaming
+  dreaming: {
+    run: (params?: { strategy?: string; dry_run?: boolean }) =>
+      request<DreamingReport>('/dreaming/run', {
+        method: 'POST',
+        body: JSON.stringify({ strategy: params?.strategy || 'default', dry_run: params?.dry_run || false }),
+      }),
+    history: (limit = 20) => request<DreamingSession[]>(`/dreaming/history?limit=${limit}`),
+    changes: (sessionId: number) => request<DreamingChange[]>(`/dreaming/${sessionId}/changes`),
+    rollback: (sessionId: number) =>
+      request<DreamingRollbackResult>(`/dreaming/${sessionId}/rollback`, { method: 'POST' }),
+  },
 };
 
 // Types
@@ -261,6 +274,50 @@ export interface Annotation {
   created_at: string;
   updated_at: string;
   replies: Annotation[];
+}
+
+export interface DreamingReport {
+  status: string;
+  session_id: number | null;
+  input_count: number;
+  output_count: number;
+  merged_count: number;
+  archived_count: number;
+  extracted_facts: number;
+  dry_run: boolean;
+  clusters: number[][];
+}
+
+export interface DreamingSession {
+  id: number;
+  started_at: string;
+  finished_at: string | null;
+  trigger: string;
+  status: string;
+  input_count: number;
+  output_count: number;
+  merged_count: number;
+  archived_count: number;
+  extracted_facts: number;
+  error_message: string | null;
+}
+
+export interface DreamingChange {
+  id: number;
+  session_id: number;
+  change_type: string;
+  source_ids: string;
+  target_id: number | null;
+  diff_summary: string;
+  created_at: string;
+}
+
+export interface DreamingRollbackResult {
+  status: string;
+  session_id: number;
+  restored_notes: number;
+  deleted_merged_notes: number;
+  changes_reverted: number;
 }
 
 // ==================== WebSocket 协作 ====================

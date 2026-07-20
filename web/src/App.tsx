@@ -8,6 +8,7 @@ import Tags from './pages/Tags';
 import Activity from './pages/Activity';
 import Settings from './pages/Settings';
 import AiChat from './pages/AiChat';
+import Dreaming from './pages/Dreaming';
 import { api } from './lib/api';
 
 /* ═══════════════════════════════════════════
@@ -65,6 +66,7 @@ function AnimatedRoutes() {
           <Route path="activity" element={<Activity />} />
           <Route path="settings" element={<Settings />} />
           <Route path="ai" element={<AiChat />} />
+          <Route path="dreaming" element={<Dreaming />} />
         </Route>
       </Routes>
     </div>
