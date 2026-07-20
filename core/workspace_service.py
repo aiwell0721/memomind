@@ -62,9 +62,10 @@ class WorkspaceService:
         columns = [col['name'] for col in info_cursor.fetchall()]
         
         if 'workspace_id' not in columns:
+            # SQLite 3.39 以下版本 ALTER TABLE 不支持同时带 REFERENCES 和 DEFAULT，
+            # 这里仅添加列，外键约束在 CREATE TABLE 时已声明。
             cursor.execute("""
-                ALTER TABLE notes ADD COLUMN workspace_id INTEGER 
-                REFERENCES workspaces(id) DEFAULT 1
+                ALTER TABLE notes ADD COLUMN workspace_id INTEGER DEFAULT 1
             """)
             # 为已有笔记设置默认工作区
             cursor.execute("""
