@@ -1,9 +1,9 @@
 @echo off
-title MemoMind DEV - 开发模式
+title MemoMind - 生产模式
 chcp 65001 >nul
 
 echo ============================================
-echo   MemoMind - 开发模式  v3.0.0
+echo   MemoMind - 生产模式  v3.0.0
 echo ============================================
 echo.
 
@@ -29,11 +29,9 @@ if "%PYTHON_EXE%"=="" (
 )
 echo [OK] Python: %PYTHON_EXE%
 
-:: ── Dev 模式：数据库在项目目录 ──
-set "MEMOMIND_DB_PATH=%~dp0memomind.db"
-
-echo [1/2] 启动开发服务器 (DB: %MEMOMIND_DB_PATH%)...
-start "MemoMind-Dev" cmd /k "%PYTHON_EXE% -m uvicorn core.api_server:create_app --factory --host 127.0.0.1 --port 8000"
+:: ── Prod 模式：不设 MEMOMIND_DB_PATH，默认 ~/.memomind/memomind.db ──
+echo [1/2] 启动生产服务...
+start "MemoMind-Prod" cmd /k "%PYTHON_EXE% -m uvicorn core.api_server:create_app --factory --host 127.0.0.1 --port 8000"
 
 echo [2/2] 等待服务就绪...
 :wait_loop
@@ -45,14 +43,13 @@ start http://127.0.0.1:8000
 
 echo.
 echo ============================================
-echo   MemoMind DEV 已启动！
+echo   MemoMind PROD 已启动！
 echo.
-echo   模式:      开发模式 (dev)
+echo   模式:      生产模式 (prod)
 echo   本地地址:  http://127.0.0.1:8000
-echo   API 文档:  http://127.0.0.1:8000/api/docs
-echo   数据库:    %MEMOMIND_DB_PATH%
+echo   数据库:    %USERPROFILE%\.memomind\memomind.db
 echo.
-echo   停止服务：关闭 "MemoMind-Dev" 命令行窗口
+echo   停止服务：关闭 "MemoMind-Prod" 命令行窗口
 echo ============================================
 echo.
 pause >nul

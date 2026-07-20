@@ -36,6 +36,7 @@ Thumbs.db
 
 # Env
 .env
+memomind.json
 
 # Runtime
 logs/

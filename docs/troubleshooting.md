@@ -231,6 +231,73 @@ volumes:
 
 ---
 
+### 9. 启动后页面空白
+
+**症状：** 启动服务后访问 `http://127.0.0.1:8000/` 页面空白，或浏览器显示连接失败。
+
+**原因：** 系统存在多个 Python 环境，启动脚本使用了缺少依赖的环境。
+
+**诊断：**
+```bash
+# 查看错误日志
+cat logs/memomind-stderr.log
+
+# 常见错误：
+# ModuleNotFoundError: No module named 'pydantic_core._pydantic_core'
+# ModuleNotFoundError: No module named 'sentence_transformers'
+```
+
+**解决方案：**
+1. 升级后的 `start-memomind.bat` 会自动检测可用 Python（优先 `.venv`，回退 PATH）
+2. 如仍需手动修复，确保 Python 环境安装了全部依赖：
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+### 10. 登录后页面崩溃（Internal Server Error / 白屏）
+
+**症状：** 登录成功后页面显示 "Internal Server Error" 或白屏，服务器日志中 API 返回 200。
+
+**原因：** 数据库中个别笔记的 `tags` 字段存储格式异常（如 `""` 空字符串而非 `"[]"` 空数组），前端渲染时类型不匹配导致 JS 崩溃。
+
+**诊断：**
+```bash
+# 检查数据库中异常 tags 数据
+python -c "
+import sqlite3, os, json
+db = sqlite3.connect(os.path.expanduser('~/.memomind/memomind.db'))
+for row in db.execute('SELECT id, title, tags FROM notes'):
+    try:
+        parsed = json.loads(row[2]) if row[2] else []
+        if not isinstance(parsed, list):
+            print(f'BAD Note {row[0]}: tags={row[2]!r}')
+    except:
+        print(f'ERROR Note {row[0]}: tags={row[2]!r}')
+"
+```
+
+**解决方案：**
+```bash
+# 修复异常数据
+python -c "
+import sqlite3, os
+db = sqlite3.connect(os.path.expanduser('~/.memomind/memomind.db'))
+db.execute(\"UPDATE notes SET tags='[]' WHERE tags NOT LIKE '[%' AND tags != ''\")
+db.commit()
+print('Fixed.')
+"
+```
+
+> v3.0.1 已加固 API 层 `_safe_parse_tags()` 函数，防止脏数据导致前端崩溃。
+
+---
+
+*最后更新：2026-07-20*
+
+---
+
 ## 📞 获取帮助
 
 如果以上方法无法解决问题：

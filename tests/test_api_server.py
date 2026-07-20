@@ -374,5 +374,92 @@ class TestBackupAPI:
         assert resp.status_code == 200
 
 
+class TestSafeParseTags:
+    """_safe_parse_tags 安全解析测试 — 防止脏数据导致前端渲染崩溃"""
+
+    def test_valid_json_array(self):
+        """正常的 JSON 数组 → 原样返回"""
+        from core.api_server import _safe_parse_tags
+        assert _safe_parse_tags('["tag1", "tag2"]') == ["tag1", "tag2"]
+
+    def test_empty_json_array(self):
+        """空的 JSON 数组 → 返回空列表"""
+        from core.api_server import _safe_parse_tags
+        assert _safe_parse_tags("[]") == []
+
+    def test_none_value(self):
+        """None / NULL 值 → 返回空列表"""
+        from core.api_server import _safe_parse_tags
+        assert _safe_parse_tags(None) == []
+
+    def test_empty_string(self):
+        """空字符串 → 返回空列表"""
+        from core.api_server import _safe_parse_tags
+        assert _safe_parse_tags("") == []
+
+    def test_corrupted_double_quoted_empty(self):
+        """脏数据：空 JSON 字符串 '""' → 返回空列表（修复的核心场景）"""
+        from core.api_server import _safe_parse_tags
+        assert _safe_parse_tags('""') == []
+
+    def test_json_string_instead_of_array(self):
+        """JSON 字符串而非数组 → 返回空列表"""
+        from core.api_server import _safe_parse_tags
+        assert _safe_parse_tags('"single-tag"') == []
+
+    def test_json_number_instead_of_array(self):
+        """JSON 数字而非数组 → 返回空列表"""
+        from core.api_server import _safe_parse_tags
+        assert _safe_parse_tags("42") == []
+
+    def test_json_object_instead_of_array(self):
+        """JSON 对象而非数组 → 返回空列表"""
+        from core.api_server import _safe_parse_tags
+        assert _safe_parse_tags('{"key": "value"}') == []
+
+    def test_invalid_json(self):
+        """无效 JSON → 返回空列表（不抛异常）"""
+        from core.api_server import _safe_parse_tags
+        assert _safe_parse_tags("not-json") == []
+
+    def test_tags_in_api_response(self, client, setup_data):
+        """集成测试：确保 API 返回的 tags 始终是列表"""
+        headers = setup_data["headers"]
+        # 创建带标签的笔记
+        resp = client.post("/api/notes", json={
+            "title": "标签测试笔记",
+            "content": "测试内容",
+            "tags": ["test-tag"],
+            "workspace_id": setup_data["ws_id"],
+        }, headers=headers)
+        assert resp.status_code == 201
+        note_id = resp.json()["id"]
+
+        # 获取笔记详情 — 验证 tags 为列表
+        resp = client.get(f"/api/notes/{note_id}", headers=headers)
+        assert isinstance(resp.json()["tags"], list)
+        assert resp.json()["tags"] == ["test-tag"]
+
+        # 列表接口 — 所有笔记的 tags 均为列表
+        resp = client.get("/api/notes?limit=100", headers=headers)
+        for note in resp.json():
+            assert isinstance(note["tags"], list), f"Note {note['id']}: tags 不是列表"
+
+    def test_empty_tags_in_api_response(self, client, setup_data):
+        """集成测试：无标签笔记返回空列表而非空字符串"""
+        headers = setup_data["headers"]
+        resp = client.post("/api/notes", json={
+            "title": "无标签笔记",
+            "content": "测试",
+            "workspace_id": setup_data["ws_id"],
+        }, headers=headers)
+        assert resp.status_code == 201
+        note_id = resp.json()["id"]
+
+        # GET 获取详情，验证 tags 为空列表
+        resp = client.get(f"/api/notes/{note_id}", headers=headers)
+        assert resp.json()["tags"] == []
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

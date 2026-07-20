@@ -233,6 +233,19 @@ def generate_token(username: str) -> str:
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
+# ==================== 辅助函数 ====================
+
+def _safe_parse_tags(tags_str: str | None) -> list:
+    """安全解析 tags JSON 字段，确保始终返回列表"""
+    import json
+    if not tags_str:
+        return []
+    try:
+        result = json.loads(tags_str)
+        return result if isinstance(result, list) else []
+    except (json.JSONDecodeError, TypeError):
+        return []
+
 # ==================== 应用初始化 ====================
 
 def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
@@ -466,7 +479,7 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
             'id': row['id'],
             'title': row['title'],
             'content': row['content'][:200] + '...' if len(row['content']) > 200 else row['content'],
-            'tags': json.loads(row['tags']) if row['tags'] else [],
+            'tags': _safe_parse_tags(row['tags']),
             'type': row['type'] if 'type' in row.keys() else 'note',
             'workspace_id': row['workspace_id'] if 'workspace_id' in row.keys() else 1,
             'created_at': row['created_at'],
@@ -497,7 +510,7 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
             'id': row['id'],
             'title': row['title'],
             'content': row['content'],
-            'tags': json.loads(row['tags']) if row['tags'] else [],
+            'tags': _safe_parse_tags(row['tags']),
             'workspace_id': row['workspace_id'] if 'workspace_id' in row.keys() else 1,
             'created_by': row['created_by'] if 'created_by' in row.keys() else None,
             'created_at': row['created_at'],
@@ -673,7 +686,7 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
             note_id=note_id,
             title=row['title'],
             content=row['content'],
-            tags=json.loads(row['tags']) if row['tags'] else [],
+            tags=_safe_parse_tags(row['tags']),
             change_summary=summary
         )
         return {'id': version_id, 'saved': True}
