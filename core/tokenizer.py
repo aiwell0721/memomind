@@ -57,12 +57,17 @@ class ChineseTokenizer:
             words = self._remove_stopwords(words)
         
         # 过滤空白和单字符（保留英文单词）
+        # 同时剔除纯 FTS5 语法字符（如 '.' '-' '_'），
+        # 避免它们进入索引或查询，导致 fts5: syntax error。
         filtered = []
         for word in words:
             word = word.strip()
             if not word:
                 continue
-            
+            # 跳过不含任何字母/数字的 token（纯标点符号）
+            if not any(c.isalnum() for c in word):
+                continue
+
             # 保留英文单词（长度>=2）或中文字符
             if re.match(r'^[a-zA-Z]+$', word):
                 if len(word) >= 2:
@@ -94,14 +99,18 @@ class ChineseTokenizer:
         # 构建 OR 查询（匹配任意一个词）
         # 对于英文词，使用精确匹配
         # 对于中文词，使用前缀匹配
+        _fts5_special = re.compile(r'[*".:()^\-]')
         query_parts = []
         for word in words:
             if re.match(r'^[a-zA-Z]+$', word):
                 # 英文词：精确匹配
                 query_parts.append(f'"{word}"')
             else:
-                # 中文词：使用 OR 连接
-                query_parts.append(word)
+                # 非纯英文 token，剥离残留的 FTS5 特殊字符
+                # （tokenize() 已过滤纯标点，此处兜底处理含混合字符的 token）
+                cleaned = _fts5_special.sub('', word)
+                if cleaned:
+                    query_parts.append(cleaned)
         
         # 如果只有一个词，直接返回
         if len(query_parts) == 1:

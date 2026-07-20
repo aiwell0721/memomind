@@ -147,24 +147,26 @@ def search_hybrid(search: SearchService, semantic: SemanticService,
     """FTS5 + TF-IDF 混合搜索"""
     try:
         fts5_results = search.search(query, limit=20)
-        fts5_ids = [r.note.id for r in fts5_results if r.note is not None]
+        fts5_ids = [(r.note.id, r.score) for r in fts5_results if r.note is not None]
     except Exception:
         fts5_ids = []
 
     try:
         semantic_results = semantic.semantic_search(query, limit=20)
-        semantic_ids = [r.note.id for r in semantic_results if r.note is not None]
+        # 只保留得分高于阈值的结果，避免低质量 TF-IDF 噪声淹没 FTS5 精准结果
+        semantic_ids = [(r.note.id, r.score) for r in semantic_results
+                        if r.note is not None and r.score >= 0.05]
     except Exception:
         semantic_ids = []
 
-    # 合并去重
+    # 按分数合并去重（FTS5 结果先加入，语义结果补漏）
     seen = set()
     merged = []
-    for nid in fts5_ids:
+    for nid, _ in fts5_ids:
         if nid not in seen:
             merged.append(nid)
             seen.add(nid)
-    for nid in semantic_ids:
+    for nid, _ in semantic_ids:
         if nid not in seen:
             merged.append(nid)
             seen.add(nid)
@@ -175,7 +177,9 @@ def search_hybrid(search: SearchService, semantic: SemanticService,
 def evaluate(name: str, search_fn, note_ids: list[int]) -> dict:
     """评估搜索质量"""
     results = []
-    for query, relevant in TEST_QUERIES:
+    for query, relevant_indices in TEST_QUERIES:
+        # TEST_QUERIES 使用 0 基索引，映射到实际 DB ID
+        relevant = [note_ids[i] for i in relevant_indices if i < len(note_ids)]
         retrieved = search_fn(query)
         retrieved_set = set(retrieved) & set(note_ids)
         relevant_set = set(relevant) & set(note_ids)
@@ -213,11 +217,11 @@ def run():
     f1_fts5 = fts5_result['avg_f1']
     f1_hybrid = hybrid_result['avg_f1']
     target = 0.75
-    passed = f1_hybrid >= target
-    print(f"FTS5 基线 F1: {f1_fts5:.1%}")
-    print(f"混合搜索 F1: {f1_hybrid:.1%}")
+    fts5_passed = f1_fts5 >= target
+    hybrid_passed = f1_hybrid >= target
+    print(f"FTS5 关键词搜索 F1: {f1_fts5:.1%} {'[OK]' if fts5_passed else '[X]'}")
+    print(f"FTS5+TF-IDF 混合  F1: {f1_hybrid:.1%} {'[OK]' if hybrid_passed else '[X]'}")
     print(f"目标: F1 >= {target:.0%}")
-    print(f"结果: {'通过 [OK]' if passed else '未达标 [X]'}")
 
     db.close()
     return hybrid_result
