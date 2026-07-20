@@ -85,8 +85,21 @@ def main():
             if latency_ok: passed += 1
             else: failed += 1
 
-    print(f"\n通过: {passed}/3 | 失败: {failed}/3")
-    print(f"(Dreaming 基准待 5.2 实现后评估)")
+    if 'dreaming' in results and isinstance(results['dreaming'], dict):
+        dr = results['dreaming']
+        compression = dr.get('compression_rate_pct', 0)
+        f1_change = dr.get('accuracy_change', -1)
+        compression_ok = compression >= 20.0
+        accuracy_ok = f1_change >= -0.05
+        print(f"  Dreaming 压缩率: {compression:.1f}% {'[OK]' if compression_ok else '[X]'}")
+        print(f"  Dreaming F1 变化: {f1_change:+.1%} {'[OK]' if accuracy_ok else '[X]'}")
+        if compression_ok and accuracy_ok:
+            passed += 1
+        else:
+            failed += 1
+
+    total = passed + failed
+    print(f"\n通过: {passed}/{total} | 失败: {failed}/{total}")
 
 
 if __name__ == '__main__':

@@ -41,6 +41,8 @@ from .conflict_service import ConflictService
 from .backup_service import BackupService
 from .collaboration_service import CollaborationService
 from .ai_provider import create_provider
+from .dreaming_service import DreamingService
+from .dreaming_scheduler import DreamingScheduler
 
 
 # ==================== Pydantic 模型 ====================
@@ -154,6 +156,12 @@ class AnnotationCreate(BaseModel):
     """创建备注的请求体"""
     content: str = Field(..., min_length=1, max_length=10000)
     parent_id: Optional[int] = None  # None=顶级备注，非None=回复某条备注
+
+
+class DreamingRunRequest(BaseModel):
+    """触发 Dreaming 的请求体"""
+    strategy: str = Field("default", pattern=r"^(default|aggressive|conservative)$")
+    dry_run: bool = False
 
 
 # ==================== 认证 ====================
@@ -419,7 +427,8 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
     rag = RAGService(db, provider=ai_provider)
     summarization = SummarizationService(db, provider=ai_provider)
     auto_tag = AutoTagService(db)
-    
+    dreaming = DreamingService(db)
+
     # ==================== 笔记 API ====================
     
     @app.get("/api/notes", response_model=list, summary="列出笔记")
@@ -1098,6 +1107,47 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
         except Exception as e:
             return {"status": "error", "message": f"❌ 连接失败: {str(e)}"}
     
+    # ==================== Dreaming API ====================
+
+    @app.post("/api/dreaming/run", summary="触发 Dreaming")
+    def run_dreaming(req: DreamingRunRequest, _: dict = Depends(verify_token)):
+        """触发记忆压缩 Dreaming 管线"""
+        try:
+            report = dreaming.run_dreaming(
+                strategy=req.strategy, dry_run=req.dry_run
+            )
+            return {
+                "status": "ok",
+                **report,
+                "clusters": [[int(nid) for nid in c] for c in report.get("clusters", [])],
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Dreaming 执行失败: {str(e)}")
+
+    @app.get("/api/dreaming/history", summary="Dreaming 历史")
+    def dreaming_history(
+        limit: int = Query(20, ge=1, le=100),
+        _: dict = Depends(verify_token)
+    ):
+        """查看 Dreaming 会话历史"""
+        sessions = dreaming.get_history(limit=limit)
+        return [dict(s) for s in sessions]
+
+    @app.get("/api/dreaming/{session_id}/changes", summary="Dreaming 变更记录")
+    def dreaming_changes(session_id: int, _: dict = Depends(verify_token)):
+        """查看指定 Dreaming 会话的变更详情"""
+        changes = dreaming.get_changes(session_id)
+        return [dict(c) for c in changes]
+
+    @app.post("/api/dreaming/{session_id}/rollback", summary="回滚 Dreaming")
+    def dreaming_rollback(session_id: int, _: dict = Depends(verify_token)):
+        """回滚一次 Dreaming 会话，恢复原始笔记"""
+        try:
+            result = dreaming.rollback(session_id)
+            return {"status": "ok", **result}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"回滚失败: {str(e)}")
+
     # ==================== 备注 API ====================
 
     @app.get("/api/notes/{note_id}/annotations", summary="列出备注")
@@ -1413,4 +1463,9 @@ def create_app(db_path: str = "~/memomind.db") -> FastAPI:
             # SPA fallback：所有非 API 路径返回 index.html
             return FileResponse(os.path.join(_static_dir, "index.html"))
     
+    # 定时 Dreaming 调度器（通过环境变量 MEMOMIND_SCHEDULE=1 启用）
+    if os.environ.get("MEMOMIND_SCHEDULE") == "1":
+        scheduler = DreamingScheduler(dreaming)
+        scheduler.start(target_hour=3)
+
     return app
