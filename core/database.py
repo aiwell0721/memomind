@@ -135,6 +135,13 @@ class Database:
 
         self.conn.commit()
 
+        # 启动时重建 FTS5 索引，确保：
+        # 1. 老版本触发器写入的未分词内容被 jieba 重新分词
+        # 2. ALTER TABLE 后的行被同步到 FTS5 虚拟表
+        # 重建开销与笔记数成正比，当前量级（<10000 条）可接受
+        self._fts_rebuild_all()
+        self.conn.commit()
+
     # SQL 写操作的正则：只匹配 notes 主表（含可选 schema 前缀），排除 notes_fts、
     # note_versions、note_tags、note_links 等同前缀表。\b 保证 'notes' 是完整词。
     _RE_INSERT_NOTES = re.compile(r"^\s*INSERT\s+(?:OR\s+\w+\s+)?INTO\s+notes\b(?!_)", re.IGNORECASE)

@@ -44,18 +44,22 @@ def main():
     if env_db:
         db_path = env_db
     elif _frozen:
-        # ── Prod 模式（.exe）→ ~/.memomind/memomind.db ──
+        # ── Prod 模式（.exe）→ ~/memomind.db ──
         _exe_dir = os.path.dirname(sys.executable)
-        _target_path = str(Path.home() / ".memomind" / "memomind.db")
-        _target_dir = str(Path.home() / ".memomind")
+        _target_path = str(Path.home() / "memomind.db")
+        _target_dir = str(Path.home())
 
         if os.path.isfile(_target_path):
             db_path = _target_path
             print(f"[MemoMind] Using database: {_target_path}")
         else:
-            # 旧路径迁移：exe同级/data/memomind.db > exe同级/memomind.db
+            # 旧路径迁移（按优先级搜索）：
+            #   1) exe 同级 data/memomind.db
+            #   2) exe 同级 memomind.db
+            #   3) ~/.memomind/memomind.db（v2.0 旧位置）
             _old_data_db = os.path.join(_exe_dir, "data", "memomind.db")
             _old_root_db = os.path.join(_exe_dir, "memomind.db")
+            _old_dotmemomind_db = str(Path.home() / ".memomind" / "memomind.db")
             _src = None
             _src_label = None
             if os.path.isfile(_old_data_db):
@@ -64,6 +68,9 @@ def main():
             elif os.path.isfile(_old_root_db):
                 _src = _old_root_db
                 _src_label = "memomind.db (exe 同级)"
+            elif os.path.isfile(_old_dotmemomind_db):
+                _src = _old_dotmemomind_db
+                _src_label = "~/.memomind/memomind.db (v2.0)"
 
             if _src:
                 import shutil
@@ -103,7 +110,7 @@ def main():
     # 确保目录存在
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
-    print(f"[MemoMind] v2.0.0")
+    print(f"[MemoMind] v3.0.0")
     print(f"{'='*40}")
     print(f"  Data:     {db_path}")
     print(f"  Address:  http://{host}:{port}")
