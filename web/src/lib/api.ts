@@ -170,10 +170,14 @@ export const api = {
 
   // Dreaming
   dreaming: {
-    run: (params?: { strategy?: string; dry_run?: boolean }) =>
+    run: (params?: { strategy?: string; dry_run?: boolean; ai_compress?: boolean }) =>
       request<DreamingReport>('/dreaming/run', {
         method: 'POST',
-        body: JSON.stringify({ strategy: params?.strategy || 'default', dry_run: params?.dry_run || false }),
+        body: JSON.stringify({
+          strategy: params?.strategy || 'default',
+          dry_run: params?.dry_run || false,
+          ai_compress: params?.ai_compress ?? true,
+        }),
       }),
     history: (limit = 20) => request<DreamingSession[]>(`/dreaming/history?limit=${limit}`),
     changes: (sessionId: number) => request<DreamingChange[]>(`/dreaming/${sessionId}/changes`),

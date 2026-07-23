@@ -300,6 +300,24 @@ class DreamingService:
         multi_clusters = [c for c in clusters if len(c) > 1]
 
         if dry_run:
+            preview_concentrates = []
+            if ai_compress and multi_clusters:
+                api_key = (os.getenv("DEEPSEEK_API_KEY") or
+                           os.getenv("AI_COMPRESS_API_KEY") or "")
+                if api_key:
+                    compressor = AiCompressor(api_key=api_key)
+                    for cluster in multi_clusters:
+                        cluster_notes = [n for n in notes if n.id in {n.id for n in cluster}]
+                        if not cluster_notes:
+                            cluster_notes = cluster
+                        result = compressor.compress_cluster(cluster_notes)
+                        preview_concentrates.append({
+                            "source_ids": [n.id for n in cluster],
+                            "ai_title": result.title,
+                            "ai_content": result.content[:300],
+                            "keywords": result.keywords,
+                        })
+
             return {
                 'session_id': None,
                 'input_count': input_count,
@@ -308,7 +326,9 @@ class DreamingService:
                 'archived_count': sum(len(c) for c in multi_clusters),
                 'extracted_facts': 0,
                 'dry_run': True,
+                'ai_compressed': bool(ai_compress and multi_clusters and preview_concentrates),
                 'clusters': [[n.id for n in c] for c in clusters if len(c) > 1],
+                'concentrates': preview_concentrates,
             }
 
         # 创建 session
@@ -334,6 +354,7 @@ class DreamingService:
 
             # AI 压缩
             concentrates = []
+            has_ai = False
             if ai_compress and multi_clusters:
                 api_key = (os.getenv("DEEPSEEK_API_KEY") or
                            os.getenv("AI_COMPRESS_API_KEY") or "")
@@ -347,13 +368,18 @@ class DreamingService:
                         result = compressor.compress_cluster(cluster_notes)
                         total_tokens += result.token_usage
 
-                        # 找到对应的 merged_note
                         merged = next(
                             (m for m in output_notes if m.id and
                              any(n.id for n in cluster)),
                             None
                         )
                         if merged:
+                            # 用 AI 内容更新合并笔记
+                            ai_tags = json.dumps(result.keywords[:5], ensure_ascii=False)
+                            self.db.execute(
+                                "UPDATE notes SET title=?, content=?, tags=? WHERE id=?",
+                                (result.title, result.content, ai_tags, merged.id)
+                            )
                             self.db.execute(
                                 """INSERT INTO dreaming_concentrates
                                    (session_id, source_ids, target_note_id,
@@ -370,13 +396,17 @@ class DreamingService:
                                 "ai_content": result.content[:200],
                                 "keywords": result.keywords,
                             })
+                            # 同步更新 output_notes 数据
+                            merged.title = result.title
+                            merged.content = result.content
+                            merged.tags = json.dumps(result.keywords[:5], ensure_ascii=False)
                     self.db.commit()
-                    # 更新 session 的 ai 字段
                     self.db.execute(
                         "UPDATE dreaming_sessions SET ai_compressed=1, token_cost=? WHERE id=?",
                         (total_tokens, session_id)
                     )
                     self.db.commit()
+                    has_ai = bool(api_key)
 
             # 计算输出数：保留的单元素 + 合并后的
             singleton_count = sum(1 for c in clusters if len(c) == 1)
@@ -410,7 +440,7 @@ class DreamingService:
             'dry_run': False,
             'clusters': [[n.id for n in c] for c in clusters if len(c) > 1],
             'concentrates': concentrates if ai_compress and multi_clusters else [],
-            'ai_compressed': bool(ai_compress and multi_clusters and api_key),
+            'ai_compressed': has_ai,
         }
 
     # ── 回滚 ─────────────────────────────────────────────

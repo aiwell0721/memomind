@@ -99,6 +99,7 @@ export default function Dreaming() {
   const [result, setResult] = useState<DreamingReport | null>(null);
   const [strategy, setStrategy] = useState<StrategyKey>('default');
   const [dryRun, setDryRun] = useState(true);
+  const [aiCompress, setAiCompress] = useState(true);
   const [expandedSession, setExpandedSession] = useState<number | null>(null);
   const [rollbackMsg, setRollbackMsg] = useState('');
 
@@ -111,7 +112,7 @@ export default function Dreaming() {
   async function handleRun() {
     setLoading(true); setError(''); setResult(null);
     try {
-      const r = await api.dreaming.run({ strategy, dry_run: dryRun });
+      const r = await api.dreaming.run({ strategy, dry_run: dryRun, ai_compress: aiCompress });
       setResult(r);
       if (!dryRun) loadHistory();
     } catch (e: unknown) {
@@ -215,6 +216,18 @@ export default function Dreaming() {
               <div>
                 <p className="text-sm font-medium text-apple-text">预览模式</p>
                 <p className="text-[11px] text-apple-text-tertiary">不写入数据库</p>
+              </div>
+            </label>
+
+            {/* ── AI 压缩开关 ── */}
+            <label className="flex items-center gap-3 cursor-pointer select-none group">
+              <input type="checkbox" checked={aiCompress} onChange={e => setAiCompress(e.target.checked)} className="sr-only" />
+              <div className={`relative w-10 h-6 rounded-full transition-colors duration-200 ${aiCompress ? 'bg-apple-accent' : 'bg-gray-300'}`}>
+                <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${aiCompress ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+              </div>
+              <div>
+                <p className='text-sm font-medium text-apple-text'>AI 压缩</p>
+                <p className='text-[11px] text-apple-text-tertiary'>调用 DeepSeek 生成精简版</p>
               </div>
             </label>
 

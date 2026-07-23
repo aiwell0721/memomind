@@ -163,7 +163,7 @@ class DreamingRunRequest(BaseModel):
     """触发 Dreaming 的请求体"""
     strategy: str = Field("default", pattern=r"^(default|aggressive|conservative)$")
     dry_run: bool = False
-    ai_compress: bool = False
+    ai_compress: bool = True
 
 
 # ==================== 认证 ====================
