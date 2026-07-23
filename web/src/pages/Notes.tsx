@@ -320,6 +320,9 @@ export default function Notes() {
                   letterSpacing: '-0.01em', overflow: 'hidden',
                   textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
+                  <span style={{ fontSize: 11, color: 'var(--apple-text-tertiary)', fontWeight: 400, marginRight: 6 }}>
+                    #{note.id}
+                  </span>
                   {note.title}
                 </h3>
                 <p style={{

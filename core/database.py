@@ -4,7 +4,6 @@ MemoMind 数据库连接管理
 
 import re
 import sqlite3
-from pathlib import Path
 from typing import Optional
 
 from .tokenizer import get_tokenizer
@@ -108,6 +107,31 @@ class Database:
                 FOREIGN KEY (session_id) REFERENCES dreaming_sessions(id)
             )
         """)
+
+        # Dreaming AI 压缩结果
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dreaming_concentrates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER NOT NULL,
+                source_ids TEXT NOT NULL,
+                target_note_id INTEGER NOT NULL,
+                ai_title TEXT DEFAULT '',
+                ai_content TEXT DEFAULT '',
+                keywords TEXT DEFAULT '[]',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES dreaming_sessions(id)
+            )
+        """)
+
+        # Dreaming AI 压缩字段迁移
+        for col in ["ai_compressed", "token_cost"]:
+            try:
+                cursor.execute(
+                    f"ALTER TABLE dreaming_sessions ADD COLUMN {col} "
+                    f"{'INTEGER DEFAULT 0' if col == 'ai_compressed' else 'INTEGER DEFAULT 0'}"
+                )
+            except sqlite3.OperationalError:
+                pass  # 已迁移
 
         # 备注功能支持（v2.1.0）
         try:

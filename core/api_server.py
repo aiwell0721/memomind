@@ -57,6 +57,7 @@ class NoteUpdate(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
     tags: Optional[List[str]] = None
+    ai_summary: Optional[str] = None
 
 class NoteSearch(BaseModel):
     query: str
@@ -162,6 +163,7 @@ class DreamingRunRequest(BaseModel):
     """触发 Dreaming 的请求体"""
     strategy: str = Field("default", pattern=r"^(default|aggressive|conservative)$")
     dry_run: bool = False
+    ai_compress: bool = False
 
 
 # ==================== 认证 ====================
@@ -556,6 +558,9 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
         if note.tags is not None:
             updates.append("tags = ?")
             params.append(json.dumps(note.tags))
+        if note.ai_summary is not None:
+            updates.append("ai_summary = ?")
+            params.append(note.ai_summary)
         
         if not updates:
             raise HTTPException(status_code=400, detail="无更新内容")
@@ -1132,7 +1137,8 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
         """触发记忆压缩 Dreaming 管线"""
         try:
             report = dreaming.run_dreaming(
-                strategy=req.strategy, dry_run=req.dry_run
+                strategy=req.strategy, dry_run=req.dry_run,
+                ai_compress=getattr(req, 'ai_compress', False),
             )
             return {
                 "status": "ok",
@@ -1177,14 +1183,16 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
             raise HTTPException(status_code=404, detail="笔记不存在")
 
         # 查询所有关联备注
-        cursor = db.execute("""
-            SELECT id, title, content, tags, created_at, updated_at, type, parent_id
-            FROM notes
-            WHERE type = 'annotation'
-              AND (parent_id = ? OR parent_id IN (
+        cursor = db.execute("""\
+            SELECT n.id, n.title, n.content, n.tags, n.created_at, n.updated_at,
+                   n.type, n.parent_id, COALESCE(u.username, '用户') AS author
+            FROM notes n
+            LEFT JOIN users u ON n.created_by = u.id
+            WHERE n.type = 'annotation'
+              AND (n.parent_id = ? OR n.parent_id IN (
                   SELECT id FROM notes WHERE parent_id = ? AND type = 'annotation'
               ))
-            ORDER BY created_at ASC
+            ORDER BY n.created_at ASC
         """, (note_id, note_id))
 
         annotations = []
@@ -1194,8 +1202,7 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
                 'id': row['id'],
                 'parent_id': row['parent_id'],
                 'content': row['content'],
-                # author 暂用固定值，后续 Phase 集成 created_by
-                'author': '用户',
+                'author': row['author'],
                 'created_at': row['created_at'],
                 'updated_at': row['updated_at'],
                 'replies': [],
@@ -1222,7 +1229,7 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
         summary="创建备注",
     )
     def create_annotation(
-        note_id: int, req: AnnotationCreate, _: dict = Depends(verify_token)
+        note_id: int, req: AnnotationCreate, user: dict = Depends(verify_token)
     ):
         """创建备注。parent_id 为 null 时是顶级备注，非 null 时是回复。"""
         import json
@@ -1244,12 +1251,20 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
             if not parent:
                 raise HTTPException(status_code=404, detail="父备注不存在")
 
-        # 3. 创建备注记录
+        # 3. 查找用户 ID
+        user_id = None
+        row = db.execute(
+            "SELECT id FROM users WHERE username = ?", (user['username'],)
+        ).fetchone()
+        if row:
+            user_id = row['id']
+
+        # 4. 创建备注记录
         cursor = db.execute(
-            """INSERT INTO notes (title, content, type, parent_id, tags)
-               VALUES (?, ?, 'annotation', ?, ?)""",
+            """INSERT INTO notes (title, content, type, parent_id, tags, created_by)
+               VALUES (?, ?, 'annotation', ?, ?, ?)""",
             ("", req.content, req.parent_id if req.parent_id is not None else note_id,
-             json.dumps([])),
+             json.dumps([]), user_id),
         )
         db.commit()
 
