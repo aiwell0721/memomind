@@ -484,8 +484,8 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
             'tags': _safe_parse_tags(row['tags']),
             'type': row['type'] if 'type' in row.keys() else 'note',
             'workspace_id': row['workspace_id'] if 'workspace_id' in row.keys() else 1,
-            'created_at': row['created_at'],
-            'updated_at': row['updated_at']
+            'created_at': row['created_at'] + 'Z' if row['created_at'] else None,
+            'updated_at': row['updated_at'] + 'Z' if row['updated_at'] else None
         } for row in cursor.fetchall()]
     
     @app.get("/api/notes/{note_id}", summary="获取笔记详情")
@@ -515,8 +515,8 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
             'tags': _safe_parse_tags(row['tags']),
             'workspace_id': row['workspace_id'] if 'workspace_id' in row.keys() else 1,
             'created_by': row['created_by'] if 'created_by' in row.keys() else None,
-            'created_at': row['created_at'],
-            'updated_at': row['updated_at'],
+            'created_at': row['created_at'] + 'Z' if row['created_at'] else None,
+            'updated_at': row['updated_at'] + 'Z' if row['updated_at'] else None,
             'type': row['type'] if 'type' in row.keys() else 'note',
             'annotation_count': annotation_count,
             'ai_summary': row['ai_summary'] if 'ai_summary' in row.keys() else '',

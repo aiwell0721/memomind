@@ -272,8 +272,8 @@ export default function Notes() {
               onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
               className="input"
               placeholder="内容（支持 Markdown）"
-              rows={6}
-              style={{ marginBottom: 16 }}
+              rows={10}
+              style={{ marginBottom: 16, minHeight: 160 }}
             />
             <div className="flex gap-2 justify-end">
               <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>取消</button>

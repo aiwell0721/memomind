@@ -493,7 +493,7 @@ textarea.input {
   box-shadow: var(--shadow-xl);
   padding: 1.5rem;
   width: 100%;
-  max-width: 480px;
+  max-width: 600px;
   animation: scaleIn 0.25s var(--ease-spring);
   max-height: 90vh;
   overflow-y: auto;
