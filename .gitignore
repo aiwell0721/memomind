@@ -53,4 +53,13 @@ web/test-results/
 web/stitch-output/
 web/stitch-backup/
 
+# 个人调试/启动脚本（本机路径特定，不入库）
+debug-startup.bat
+install-startup-lnk.ps1
+
+# 调试截图脚本与产物（含硬编码测试凭据）
+web/dreaming-screenshot.cjs
+web/screenshot.mjs
+web/screenshot-*.png
+
 data/
