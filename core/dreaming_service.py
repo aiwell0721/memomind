@@ -91,14 +91,15 @@ class DreamingService:
         if workspace_id and has_ws:
             cursor = self.db.execute(
                 "SELECT id, title, content, tags, created_at, updated_at "
-                "FROM notes WHERE created_at <= ? AND workspace_id = ? "
-                "ORDER BY created_at",
+                "FROM notes WHERE created_at <= ? AND is_archived = 0 "
+                "AND workspace_id = ? ORDER BY created_at",
                 (cutoff.isoformat(), workspace_id)
             )
         else:
             cursor = self.db.execute(
                 "SELECT id, title, content, tags, created_at, updated_at "
-                "FROM notes WHERE created_at <= ? ORDER BY created_at",
+                "FROM notes WHERE created_at <= ? AND is_archived = 0 "
+                "ORDER BY created_at",
                 (cutoff.isoformat(),)
             )
 
@@ -109,12 +110,13 @@ class DreamingService:
         if workspace_id and has_ws:
             cursor = self.db.execute(
                 "SELECT id, title, content, tags, created_at, updated_at "
-                "FROM notes WHERE workspace_id = ?",
+                "FROM notes WHERE workspace_id = ? AND is_archived = 0",
                 (workspace_id,)
             )
         else:
             cursor = self.db.execute(
-                "SELECT id, title, content, tags, created_at, updated_at FROM notes"
+                "SELECT id, title, content, tags, created_at, updated_at "
+                "FROM notes WHERE is_archived = 0"
             )
         return [Note.from_row(row) for row in cursor.fetchall()]
 
@@ -237,8 +239,8 @@ class DreamingService:
         source_ids = [n.id for n in cluster]
         for nid in source_ids:
             self.db.execute(
-                "UPDATE notes SET content = content || ? WHERE id = ?",
-                (f"\n\n[归档于 Dreaming: 已合并到 note#{merged_id}]", nid)
+                "UPDATE notes SET is_archived = 1 WHERE id = ?",
+                (nid,)
             )
         self.db.commit()
 
@@ -476,20 +478,12 @@ class DreamingService:
             source_ids = json.loads(row['source_ids'])
             target_id = row['target_id']
 
-            # 恢复原始笔记（去掉归档标记）
+            # 恢复原始笔记（取消归档字段）
             for nid in source_ids:
                 cursor2 = self.db.execute(
-                    "SELECT content FROM notes WHERE id=?", (nid,)
+                    "UPDATE notes SET is_archived=0 WHERE id=?", (nid,)
                 )
-                note_row = cursor2.fetchone()
-                if note_row:
-                    content = note_row['content']
-                    # 移除归档标记
-                    cleaned = content.split("\n\n[归档于 Dreaming:")[0]
-                    self.db.execute(
-                        "UPDATE notes SET content=? WHERE id=?",
-                        (cleaned, nid)
-                    )
+                if cursor2.rowcount:
                     restored += 1
 
             # 删除合并产生的笔记

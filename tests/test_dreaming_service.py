@@ -265,3 +265,72 @@ class TestDreamingService:
         session_id = history[0]['id']
         changes = service.get_changes(session_id)
         assert isinstance(changes, list)
+
+
+# ── 归档隔离（P0）：is_archived 字段化 ────────────────────
+
+class TestArchivingField:
+    """归档状态应使用 is_archived 字段，而非 content 字符串标记"""
+
+    def test_merge_cluster_archives_via_field(self, db_with_notes):
+        """合并后源笔记 content 保持纯净，is_archived=1"""
+        from core.dreaming_service import DreamingService
+        service = DreamingService(db_with_notes)
+        notes = service.select_memories_for_dreaming(strategy="aggressive")
+        clusters = service.cluster_memories(notes)
+        multi = [c for c in clusters if len(c) > 1]
+        if not multi:
+            pytest.skip("无多元素簇，跳过")
+        cluster = multi[0]
+        source_ids = [n.id for n in cluster]
+        original_contents = {n.id: n.content for n in cluster}
+
+        service.merge_cluster(cluster)
+
+        for nid in source_ids:
+            row = db_with_notes.execute(
+                "SELECT content, is_archived FROM notes WHERE id=?", (nid,)
+            ).fetchone()
+            assert row["is_archived"] == 1, f"笔记 {nid} 应以字段标记为已归档"
+            assert "[归档于 Dreaming" not in row["content"], \
+                f"笔记 {nid} content 不应被追加归档标记"
+            assert row["content"] == original_contents[nid], \
+                f"笔记 {nid} content 应保持原样"
+
+    def test_rollback_restores_field(self, db_with_notes):
+        """回滚后 is_archived=0，不依赖字符串切割"""
+        from core.dreaming_service import DreamingService
+        service = DreamingService(db_with_notes)
+        report = service.run_dreaming(strategy="aggressive", dry_run=False)
+        session_id = report.get("session_id")
+        if not session_id:
+            pytest.skip("无 session_id，跳过")
+
+        archived = db_with_notes.execute(
+            "SELECT id FROM notes WHERE is_archived=1"
+        ).fetchall()
+        if not archived:
+            pytest.skip("无归档笔记，跳过")
+
+        service.rollback(session_id)
+
+        for row in archived:
+            check = db_with_notes.execute(
+                "SELECT is_archived FROM notes WHERE id=?", (row["id"],)
+            ).fetchone()
+            assert check["is_archived"] == 0, f"回滚后笔记 {row['id']} 应取消归档"
+
+    def test_select_memories_excludes_archived(self, db_with_notes):
+        """已归档笔记不应被再次选中"""
+        from core.dreaming_service import DreamingService
+        service = DreamingService(db_with_notes)
+        service.run_dreaming(strategy="aggressive", dry_run=False)
+
+        selected = service.select_memories_for_dreaming(strategy="aggressive")
+        selected_ids = {n.id for n in selected}
+        archived_ids = {
+            row["id"] for row in db_with_notes.execute(
+                "SELECT id FROM notes WHERE is_archived=1"
+            ).fetchall()
+        }
+        assert not (selected_ids & archived_ids), "已归档笔记不应被再次选中"

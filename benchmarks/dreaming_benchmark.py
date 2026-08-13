@@ -93,13 +93,20 @@ class DreamingBenchmark:
         total_recall = 0.0
         total_f1 = 0.0
 
+        # 已归档笔记 ID 集合（Dreaming 后应视为非活跃）
+        archived_ids = {
+            row[0] for row in self.db.execute(
+                "SELECT id FROM notes WHERE is_archived=1"
+            ).fetchall()
+        }
+
         for question, expected_min in TEST_QUESTIONS:
             results = self.search.search(question, limit=10)
             # 过滤已归档笔记
             active_hits = [
                 r for r in results
                 if r.note is not None
-                and '[归档于 Dreaming:' not in r.note.content
+                and r.note.id not in archived_ids
             ][:5]
             hit_count = len(active_hits)
 
@@ -134,8 +141,7 @@ class DreamingBenchmark:
     def measure_after(self) -> dict:
         """度量 Dreaming 后的状态（仅统计活跃笔记，排除已归档）"""
         cursor = self.db.execute(
-            "SELECT COUNT(*) FROM notes "
-            "WHERE content NOT LIKE '%[归档于 Dreaming:%'"
+            "SELECT COUNT(*) FROM notes WHERE is_archived=0"
         )
         note_count = cursor.fetchone()[0]
 

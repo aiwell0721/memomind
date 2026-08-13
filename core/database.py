@@ -50,6 +50,7 @@ class Database:
                 title TEXT NOT NULL,
                 content TEXT NOT NULL,
                 tags TEXT,
+                is_archived INTEGER NOT NULL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -154,6 +155,14 @@ class Database:
         # AI 摘要持久化
         try:
             cursor.execute("ALTER TABLE notes ADD COLUMN ai_summary TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
+
+        # 归档状态字段化（P0）：旧库迁移
+        try:
+            cursor.execute(
+                "ALTER TABLE notes ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0"
+            )
         except sqlite3.OperationalError:
             pass
 
