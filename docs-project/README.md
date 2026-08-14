@@ -83,6 +83,7 @@ docs-project/
 | 04 | [记忆增强路线图-Dreaming与Skills](./05-development-plan/04-记忆增强路线图-Dreaming与Skills.md) | Phase 5 记忆增强开发计划（2026-07） |
 | **05** | **[备注功能开发计划](./05-development-plan/05-备注功能开发计划.md)** | **备注功能 Phase 1-5 开发计划** |
 | **06** | **[llm-wiki借鉴评估与演进计划](./05-development-plan/06-llm-wiki借鉴评估与演进计划.md)** | **llm-wiki 借鉴点评估 + P0-P3 演进计划（2026-08）** |
+| **07** | **[技能借鉴评估-ontology与self-improving](./05-development-plan/07-技能借鉴评估-ontology与self-improving.md)** | **ontology + self-improving 借鉴评估（2026-08）** |
 
 ## 第6类：测试文档 (`06-test-docs/`)
 
