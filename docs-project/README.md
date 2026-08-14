@@ -72,6 +72,7 @@ docs-project/
 | 06 | [数据模型设计](./04-detailed-design/06-数据模型设计.md) | 数据库模型 |
 || **07** | **[备注功能详细设计](./04-detailed-design/07-备注功能详细设计.md)** | **备注功能 API/前端/数据模型详细设计** |
 || **08** | **[AI压缩Dreaming详细设计](./04-detailed-design/08-AI压缩Dreaming详细设计.md)** | **Dreaming AI 压缩功能详细设计（2026-07）** |
+|| **09** | **[lint知识健康报告详细设计](./04-detailed-design/09-lint知识健康报告详细设计.md)** | **lint_knowledge 统一知识健康报告（2026-08）** |
 
 ## 第5类：产品开发计划 (`05-development-plan/`)
 

@@ -310,3 +310,70 @@ class TestSuggestConsolidation:
         result = kg.suggest_consolidation()
         # 社区检测应发现 Python 和 JavaScript 两个主题
         assert len(result['topics']) >= 1
+
+
+class TestLintKnowledge:
+    """lint_knowledge 统一知识健康报告测试"""
+
+    def test_lint_returns_four_keys(self, kg):
+        """返回 merge/update/link/delete 四类"""
+        result = kg.lint_knowledge()
+        assert set(result.keys()) == {'merge', 'update', 'link', 'delete'}
+
+    def test_lint_empty_database(self, kg):
+        """空库返回空四类"""
+        result = kg.lint_knowledge()
+        assert result['merge'] == []
+        assert result['update'] == []
+        assert result['link'] == []
+        assert result['delete'] == []
+
+    def test_lint_detects_merge(self, kg):
+        """高相似笔记进入 merge"""
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("Python 装饰器详解", "装饰器是 Python 的高级语法特性，用于增强函数功能而不修改函数本身。", json.dumps(["Python", "编程"])))
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("Python 装饰器进阶", "Python 装饰器是高级语法特性，用于增强函数功能。装饰器不修改函数本身。", json.dumps(["Python", "进阶"])))
+        kg.db.commit()
+
+        result = kg.lint_knowledge(similarity_threshold=0.1)
+        assert len(result['merge']) > 0
+
+    def test_lint_detects_stale(self, kg):
+        """陈旧笔记进入 update"""
+        kg.db.execute("INSERT INTO notes (title, content, tags, updated_at) VALUES (?, ?, ?, ?)",
+                     ("过时笔记", "旧内容", json.dumps(["旧"]), "2024-01-01 00:00:00"))
+        kg.db.commit()
+
+        result = kg.lint_knowledge(days_threshold=365)
+        stale_ids = [s['note_id'] for s in result['update']]
+        cursor = kg.db.execute("SELECT id FROM notes WHERE title = ?", ("过时笔记",))
+        assert cursor.fetchone()['id'] in stale_ids
+
+    def test_lint_detects_orphan(self, kg):
+        """无任何边相连的孤立笔记进入 link"""
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("机器学习基础", "机器学习基础概念", json.dumps(["AI", "机器学习"])))
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("深度学习", "深度学习神经网络", json.dumps(["AI", "深度学习"])))
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("咖啡冲泡", "咖啡豆研磨萃取技巧", json.dumps(["咖啡"])))
+        kg.db.commit()
+
+        result = kg.lint_knowledge()
+        cursor = kg.db.execute("SELECT id FROM notes WHERE title = ?", ("咖啡冲泡",))
+        orphan_id = cursor.fetchone()['id']
+        link_ids = [l['note_id'] for l in result['link']]
+        assert orphan_id in link_ids
+
+    def test_lint_delete_candidate(self, kg):
+        """孤儿且陈旧的笔记进入 delete"""
+        kg.db.execute("INSERT INTO notes (title, content, tags, updated_at) VALUES (?, ?, ?, ?)",
+                     ("孤立陈旧笔记", "独特内容xyz123", json.dumps(["独特"]), "2024-01-01 00:00:00"))
+        kg.db.commit()
+
+        result = kg.lint_knowledge(days_threshold=365)
+        cursor = kg.db.execute("SELECT id FROM notes WHERE title = ?", ("孤立陈旧笔记",))
+        note_id = cursor.fetchone()['id']
+        delete_ids = [d['note_id'] for d in result['delete']]
+        assert note_id in delete_ids

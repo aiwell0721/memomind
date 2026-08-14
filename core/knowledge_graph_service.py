@@ -383,3 +383,65 @@ class KnowledgeGraphService:
             'merge_suggestions': merge_suggestions,
             'stale_candidates': stale_candidates
         }
+
+    def lint_knowledge(
+        self,
+        workspace_id: Optional[int] = None,
+        days_threshold: int = 90,
+        similarity_threshold: float = 0.6,
+        max_nodes: int = 100,
+    ) -> Dict:
+        """
+        统一知识健康报告
+
+        整合四类建议：
+        - merge: 内容高相似的笔记（该合并）
+        - update: 长期未更新的笔记（该更新）
+        - link: 图谱孤儿节点（无任何边相连，该补链接）
+        - delete: 孤儿且陈旧的笔记（该删）
+
+        Args:
+            workspace_id: 工作区过滤
+            days_threshold: 陈旧天数阈值
+            similarity_threshold: Jaccard 相似度阈值
+            max_nodes: 最大分析节点数
+
+        Returns:
+            {'merge': [...], 'update': [...], 'link': [...], 'delete': [...]}
+        """
+        graph = self.build_graph(workspace_id=workspace_id, max_nodes=max_nodes)
+
+        if not graph['nodes']:
+            return {'merge': [], 'update': [], 'link': [], 'delete': []}
+
+        # 孤儿节点：既非 source 也非 target
+        connected: Set[int] = set()
+        for edge in graph['edges']:
+            connected.add(edge['source'])
+            connected.add(edge['target'])
+        orphans = [n for n in graph['nodes'] if n['id'] not in connected]
+
+        # 复用 suggest_consolidation 拿 merge + stale
+        suggestions = self.suggest_consolidation(
+            workspace_id=workspace_id,
+            days_threshold=days_threshold,
+            similarity_threshold=similarity_threshold,
+            max_nodes=max_nodes,
+        )
+
+        # delete = 孤儿 ∩ 陈旧
+        stale_ids = {s['note_id'] for s in suggestions['stale_candidates']}
+        link_candidates = [
+            {'note_id': n['id'], 'title': n['label']} for n in orphans
+        ]
+        delete_candidates = [
+            {'note_id': n['id'], 'title': n['label']}
+            for n in orphans if n['id'] in stale_ids
+        ]
+
+        return {
+            'merge': suggestions['merge_suggestions'],
+            'update': suggestions['stale_candidates'],
+            'link': link_candidates,
+            'delete': delete_candidates,
+        }
