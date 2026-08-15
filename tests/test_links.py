@@ -47,6 +47,12 @@ class TestLinkService(unittest.TestCase):
         self.links.update_note_links(2, notes[1][1])  # Note B
         self.links.update_note_links(3, notes[2][1])  # Note C
     
+    def test_link_type_column_exists(self):
+        """note_links 表含 link_type 列，默认 'reference'"""
+        cursor = self.db.execute("PRAGMA table_info(note_links)")
+        columns = [row['name'] for row in cursor.fetchall()]
+        self.assertIn('link_type', columns)
+
     def test_extract_links(self):
         """Test extract wiki links from content"""
         content = "This is [[Note A]] and [[Note B|Note B Alias]]."

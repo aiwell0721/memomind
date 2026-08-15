@@ -334,3 +334,35 @@ class TestArchivingField:
             ).fetchall()
         }
         assert not (selected_ids & archived_ids), "已归档笔记不应被再次选中"
+
+
+class TestSupersedesEdge:
+    """Dreaming 合并记 supersedes 边测试"""
+
+    def test_merge_cluster_records_supersedes_edge(self, db_with_notes):
+        """合并后 note_links 记 merged→source 的 supersedes 边"""
+        from core.link_service import LinkService
+        from core.dreaming_service import DreamingService
+
+        # 初始化 note_links 表（带 link_type）
+        LinkService(db_with_notes)
+
+        service = DreamingService(db_with_notes)
+        notes = service.select_memories_for_dreaming(strategy="aggressive")
+        clusters = service.cluster_memories(notes)
+        multi = [c for c in clusters if len(c) > 1]
+        if not multi:
+            pytest.skip("无多元素簇，跳过")
+
+        cluster = multi[0]
+        source_ids = [n.id for n in cluster]
+        merged = service.merge_cluster(cluster)
+
+        for nid in source_ids:
+            row = db_with_notes.execute(
+                "SELECT link_type FROM note_links "
+                "WHERE source_note_id=? AND target_note_id=?",
+                (merged.id, nid)
+            ).fetchone()
+            assert row is not None, f"应有 merged→{nid} 的 supersedes 边"
+            assert row['link_type'] == 'supersedes'

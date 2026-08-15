@@ -56,13 +56,22 @@ class LinkService:
             CREATE TABLE IF NOT EXISTS note_links (
                 source_note_id INTEGER NOT NULL,
                 target_note_id INTEGER NOT NULL,
+                link_type TEXT NOT NULL DEFAULT 'reference',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (source_note_id, target_note_id),
                 FOREIGN KEY (source_note_id) REFERENCES notes(id),
                 FOREIGN KEY (target_note_id) REFERENCES notes(id)
             )
         """)
-        
+
+        # 旧库迁移：补 link_type 字段
+        try:
+            cursor.execute(
+                "ALTER TABLE note_links ADD COLUMN link_type TEXT NOT NULL DEFAULT 'reference'"
+            )
+        except Exception:
+            pass  # 已迁移（新表已含该列）
+
         # 创建索引
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_links_target 

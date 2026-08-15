@@ -242,6 +242,17 @@ class DreamingService:
                 "UPDATE notes SET is_archived = 1 WHERE id = ?",
                 (nid,)
             )
+
+        # 记 supersedes 边：合并笔记替代被合并笔记
+        try:
+            for nid in source_ids:
+                self.db.execute(
+                    "INSERT OR IGNORE INTO note_links "
+                    "(source_note_id, target_note_id, link_type) VALUES (?, ?, 'supersedes')",
+                    (merged_id, nid)
+                )
+        except Exception:
+            pass  # note_links 表可能不存在
         self.db.commit()
 
         if session_id:
