@@ -17,6 +17,7 @@ from core.search_service import SearchService
 from core.semantic_service import SemanticService
 from core.auto_tag_service import AutoTagService
 from core.rag_service import RAGService
+from core.ai_provider import create_provider
 from core.summarization_service import SummarizationService
 from core.knowledge_graph_service import KnowledgeGraphService
 from core.dreaming_service import DreamingService
@@ -108,16 +109,31 @@ def cmd_tags(args):
 def cmd_ask(args):
     """RAG 问答"""
     db = get_db(args.db)
-    rag = RAGService(db)
-    
+    provider = create_provider()
+    rag = RAGService(db, provider=provider)
+
     answer = rag.ask(args.question)
     print(f"Q: {args.question}\n")
     print(f"A: {answer.answer}\n")
-    
+
     if answer.sources:
         print("来源：")
         for source in answer.sources:
             print(f"  - {source['title']} (confidence: {source['score']:.2f})")
+
+    # P2 回写：AI 提炼候选笔记，用户确认后保存
+    suggested = rag.suggest_note(args.question, answer.answer)
+    if suggested:
+        print(f"\n💡 是否将答案保存为笔记？")
+        print(f"   标题：{suggested['title']}")
+        confirm = input("   [y/N] ").strip().lower()
+        if confirm in ("y", "yes"):
+            cursor = db.execute(
+                "INSERT INTO notes (title, content) VALUES (?, ?)",
+                (suggested["title"], suggested["content"])
+            )
+            db.commit()
+            print(f"✅ 笔记已保存，ID: {cursor.lastrowid}")
 
 
 def cmd_summarize(args):

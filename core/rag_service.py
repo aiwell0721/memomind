@@ -92,7 +92,41 @@ class RAGService:
         answer, confidence = self._generate_answer(question, context, results)
         
         return RAGAnswer(answer, sources, confidence)
-    
+
+    def suggest_note(self, question: str, answer: str) -> Optional[Dict]:
+        """
+        用 AI 将问答结果提炼为候选笔记（回写的"建议"环节）
+
+        Args:
+            question: 用户问题
+            answer: RAG 回答内容
+
+        Returns:
+            {'title': ..., 'content': ...} 或 None（无 provider / 失败 / 空响应）
+        """
+        if not self.provider:
+            return None
+
+        prompt = (
+            "请把下面的问答提炼成一条值得保存的知识笔记。"
+            "输出两行：第一行是笔记标题，第二行是笔记正文。"
+        )
+        context = f"问题：{question}\n回答：{answer}"
+
+        try:
+            raw = self.provider.answer(prompt, context)
+        except Exception:
+            return None
+
+        if not raw or not raw.strip():
+            return None
+
+        lines = raw.strip().split("\n")
+        title = lines[0].strip().lstrip("#").strip() or question[:50]
+        content = "\n".join(lines[1:]).strip() or answer
+
+        return {"title": title, "content": content}
+
     def _build_context(
         self,
         results: List,

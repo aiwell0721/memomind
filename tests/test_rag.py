@@ -234,3 +234,57 @@ class TestEdgeCases:
         """测试工作区过滤"""
         answer = rag.ask("Python", workspace_id=1)
         assert isinstance(answer, RAGAnswer)
+
+
+class FakeProvider:
+    """测试用假 provider，实现 AIProvider 接口"""
+
+    def __init__(self, response="", raise_error=False):
+        self.response = response
+        self.raise_error = raise_error
+
+    def summarize(self, text, max_length=200):
+        return ""
+
+    def answer(self, question, context):
+        if self.raise_error:
+            raise RuntimeError("mock provider error")
+        return self.response
+
+    def embed(self, text):
+        return []
+
+
+class TestSuggestNote:
+    """suggest_note 候选笔记提炼测试"""
+
+    def test_suggest_note_with_provider(self, db):
+        """provider 返回结构化文本，解析出 title + content"""
+        provider = FakeProvider(response="知识笔记标题\n这是提炼的知识笔记内容")
+        rag = RAGService(db, provider=provider)
+        result = rag.suggest_note("问题", "答案")
+        assert result == {'title': '知识笔记标题', 'content': '这是提炼的知识笔记内容'}
+
+    def test_suggest_note_without_provider(self, db):
+        """无 provider（本地模式）返回 None"""
+        rag = RAGService(db)
+        assert rag.suggest_note("问题", "答案") is None
+
+    def test_suggest_note_provider_error(self, db):
+        """provider 异常返回 None"""
+        provider = FakeProvider(raise_error=True)
+        rag = RAGService(db, provider=provider)
+        assert rag.suggest_note("问题", "答案") is None
+
+    def test_suggest_note_empty_response(self, db):
+        """provider 返回空返回 None"""
+        provider = FakeProvider(response="")
+        rag = RAGService(db, provider=provider)
+        assert rag.suggest_note("问题", "答案") is None
+
+    def test_suggest_note_content_fallback(self, db):
+        """只有标题无内容时，content 兜底用 answer"""
+        provider = FakeProvider(response="只有标题没有内容")
+        rag = RAGService(db, provider=provider)
+        result = rag.suggest_note("问题", "这是答案内容")
+        assert result == {'title': '只有标题没有内容', 'content': '这是答案内容'}
