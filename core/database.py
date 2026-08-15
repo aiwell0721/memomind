@@ -51,6 +51,7 @@ class Database:
                 content TEXT NOT NULL,
                 tags TEXT,
                 is_archived INTEGER NOT NULL DEFAULT 0,
+                archived_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -163,6 +164,12 @@ class Database:
             cursor.execute(
                 "ALTER TABLE notes ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0"
             )
+        except sqlite3.OperationalError:
+            pass
+
+        # 归档时间（分层归档）：旧库迁移
+        try:
+            cursor.execute("ALTER TABLE notes ADD COLUMN archived_at TIMESTAMP")
         except sqlite3.OperationalError:
             pass
 

@@ -5,6 +5,7 @@ MemoMind 搜索服务 - 基于 SQLite FTS5 的全文搜索
 
 import re
 import json
+from datetime import datetime
 from typing import List, Optional
 from .database import Database
 from .models import Note, SearchResult
@@ -60,38 +61,47 @@ class SearchService:
                 params.append('%"' + tag + '"%')
             tag_filter = "AND (" + " OR ".join(tag_conditions) + ")"
         
-        # FTS5 搜索（带 BM25 排序）
+        # FTS5 搜索（带 BM25 排序，归档笔记降权排后）
         sql = f"""
-            SELECT 
+            SELECT
                 n.id,
                 n.title,
                 n.content,
                 n.tags,
                 n.created_at,
                 n.updated_at,
-                bm25(notes_fts) as score
+                bm25(notes_fts) as score,
+                n.is_archived
             FROM notes_fts
             JOIN notes n ON notes_fts.rowid = n.id
             WHERE notes_fts MATCH ?
             {tag_filter}
-            ORDER BY score DESC
+            ORDER BY n.is_archived ASC, score DESC
             LIMIT ? OFFSET ?
         """
-        
+
         params = [fts_query] + params + [limit, offset]
         cursor = self.db.execute(sql, params)
-        
+
         results = []
         for row in cursor.fetchall():
-            note = Note.from_row(row)
+            note = Note(
+                id=row[0],
+                title=row[1],
+                content=row[2],
+                tags=json.loads(row[3]) if row[3] else [],
+                created_at=datetime.fromisoformat(row[4]) if row[4] else None,
+                updated_at=datetime.fromisoformat(row[5]) if row[5] else None,
+            )
             # 生成高亮
             highlights = self._highlight(note, query)
             results.append(SearchResult(
                 note=note,
                 score=-row[6],  # bm25 返回负值，取反使高分在前
-                highlights=highlights
+                highlights=highlights,
+                is_archived=bool(row[7]),
             ))
-        
+
         return results
     
     def _build_fts_query(self, query: str) -> str:

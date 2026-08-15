@@ -62,11 +62,13 @@ class SearchResult:
     note: Note
     score: float
     highlights: dict  # {'title': '...', 'content': '...'}
-    
+    is_archived: bool = False
+
     def to_dict(self) -> dict:
         """转换为字典"""
         return {
             'note': self.note.to_dict(),
             'score': self.score,
-            'highlights': self.highlights
+            'highlights': self.highlights,
+            'is_archived': self.is_archived,
         }

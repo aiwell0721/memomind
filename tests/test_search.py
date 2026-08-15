@@ -59,6 +59,21 @@ class TestSearchService(unittest.TestCase):
         titles = [r.note.title for r in results]
         self.assertTrue(any("笔记" in t for t in titles))
     
+    def test_archived_notes_sorted_last(self):
+        """归档笔记排在搜索结果最后"""
+        import json
+        cursor = self.db.execute(
+            "INSERT INTO notes (title, content, tags, is_archived) VALUES (?, ?, ?, 1)",
+            ("归档 笔记 存档", "这 是 一条 归档 的 笔记 内容", json.dumps(["归档"]))
+        )
+        self.db.commit()
+
+        results = self.search.search("笔记")
+        self.assertGreater(len(results), 0)
+        # 归档的排在最后，活跃的排前面
+        self.assertTrue(results[-1].is_archived)
+        self.assertFalse(results[0].is_archived)
+
     def test_multi_term_search(self):
         """测试多关键词搜索"""
         results = self.search.search("设计 软件")

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { toast } from '../App';
-import type { Note, SearchResult } from '../lib/api';
+import type { Note, SearchResult, ArchivedNote } from '../lib/api';
 
 /* ── Relative time formatter ── */
 function formatDate(dateStr: string): string {
@@ -91,6 +91,9 @@ export default function Notes() {
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivedNotes, setArchivedNotes] = useState<ArchivedNote[]>([]);
+  const [archivedCount, setArchivedCount] = useState(0);
 
   /* ── Load notes ── */
   const loadNotes = useCallback(async () => {
@@ -107,6 +110,28 @@ export default function Notes() {
   }, [workspaceId]);
 
   useEffect(() => { loadNotes(); }, [loadNotes]);
+
+  /* ── Load archived count ── */
+  useEffect(() => {
+    api.archivedNotes({ limit: 100 }).then((d) => setArchivedCount(d.length)).catch(() => {});
+  }, []);
+
+  /* ── Toggle archived view ── */
+  const handleShowArchived = async () => {
+    if (showArchived) {
+      setShowArchived(false);
+      loadNotes();
+      return;
+    }
+    try {
+      const data = await api.archivedNotes({ limit: 100 });
+      setArchivedNotes(data);
+      setArchivedCount(data.length);
+      setShowArchived(true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '加载归档失败');
+    }
+  };
 
   /* ── URL tag param ── */
   useEffect(() => {
@@ -179,6 +204,9 @@ export default function Notes() {
   };
 
   const displayNotes = searchResults ? searchResults.map((r) => r.note) : notes;
+  const archivedNoteIds = new Set(
+    (searchResults ?? []).filter((r) => r.is_archived).map((r) => r.note.id)
+  );
 
   return (
     <div className="page-enter" style={{ padding: '0 2rem 2rem' }}>
@@ -199,12 +227,17 @@ export default function Notes() {
             </div>
           )}
         </div>
-        <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          新建笔记
-        </button>
+        <div className="flex items-center gap-2">
+          <button className="btn btn-ghost" onClick={handleShowArchived}>
+            {showArchived ? '返回笔记' : `归档 ${archivedCount} 条`}
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowCreate(true)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            新建笔记
+          </button>
+        </div>
       </div>
 
       {/* ── Search Bar ── */}
@@ -285,8 +318,34 @@ export default function Notes() {
         </div>
       )}
 
+      {/* ── Archived View ── */}
+      {showArchived && (
+        <div className="stagger">
+          {archivedNotes.length === 0 ? (
+            <EmptyNotes hasQuery={false} onCreate={() => setShowCreate(true)} />
+          ) : (
+            archivedNotes.map((a) => (
+              <div
+                key={a.id}
+                className="card card-hover"
+                style={{ cursor: 'pointer', padding: '1rem 1.25rem', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', opacity: 0.65 }}
+                onClick={() => navigate(`/notes/${a.id}`)}
+              >
+                <div>
+                  <h3 style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>{a.title}</h3>
+                  <span style={{ fontSize: 11, color: 'var(--apple-text-tertiary)' }}>
+                    {a.archived_at ? `归档于 ${formatDate(a.archived_at)}` : ''}
+                  </span>
+                </div>
+                <span style={{ fontSize: 10, color: 'var(--apple-text-tertiary)', border: '0.5px solid var(--apple-border)', borderRadius: 4, padding: '0 4px', flexShrink: 0 }}>已归档</span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       {/* ── Content Area ── */}
-      {loading ? (
+      {!showArchived && (loading ? (
         <NoteSkeleton />
       ) : displayNotes.length === 0 ? (
         <EmptyNotes hasQuery={!!searchResults || !!query} onCreate={() => setShowCreate(true)} />
@@ -319,11 +378,17 @@ export default function Notes() {
                   fontWeight: 600, fontSize: 15, marginBottom: 4,
                   letterSpacing: '-0.01em', overflow: 'hidden',
                   textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  opacity: archivedNoteIds.has(note.id) ? 0.55 : 1,
                 }}>
                   <span style={{ fontSize: 11, color: 'var(--apple-text-tertiary)', fontWeight: 400, marginRight: 6 }}>
                     #{note.id}
                   </span>
                   {note.title}
+                  {archivedNoteIds.has(note.id) && (
+                    <span style={{ fontSize: 10, color: 'var(--apple-text-tertiary)', marginLeft: 8, border: '0.5px solid var(--apple-border)', borderRadius: 4, padding: '0 4px' }}>
+                      已归档
+                    </span>
+                  )}
                 </h3>
                 <p style={{
                   fontSize: 13, color: 'var(--apple-text-secondary)',
@@ -395,7 +460,7 @@ export default function Notes() {
             </div>
           ))}
         </div>
-      )}
+      ))}
     </div>
   );
 }

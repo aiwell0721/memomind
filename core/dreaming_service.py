@@ -239,8 +239,8 @@ class DreamingService:
         source_ids = [n.id for n in cluster]
         for nid in source_ids:
             self.db.execute(
-                "UPDATE notes SET is_archived = 1 WHERE id = ?",
-                (nid,)
+                "UPDATE notes SET is_archived = 1, archived_at = ? WHERE id = ?",
+                (datetime.now().isoformat(), nid)
             )
 
         # 记 supersedes 边：合并笔记替代被合并笔记

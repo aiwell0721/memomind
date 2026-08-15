@@ -646,6 +646,29 @@ export default function NoteEditor() {
       {/* ═══ 备注区 ═══ */}
       {note && <AnnotationSection noteId={note.id} />}
 
+      {/* ═══ Merged Sources（碎片反查） ═══ */}
+      {note?.merged_sources && note.merged_sources.length > 0 && (
+        <div className="card" style={{ marginTop: '1.5rem' }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ marginRight: 6, verticalAlign: 'middle' }}>
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+            合并来源 ({note.merged_sources.length})
+          </h3>
+          <div>
+            {note.merged_sources.map((s, i) => (
+              <span
+                key={i}
+                style={{ display: 'block', fontSize: 13, color: 'var(--apple-text-secondary)', cursor: 'pointer', padding: '0.375rem 0' }}
+                onClick={() => navigate(`/notes/${s.id}`)}
+              >
+                ← {s.title}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ═══ Incoming Links ═══ */}
       {incomingLinks.length > 0 && (
         <div className="card" style={{ marginTop: '1.5rem' }}>

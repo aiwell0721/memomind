@@ -45,6 +45,12 @@ export const api = {
     return request<Note[]>(`/notes?${qs}`);
   },
   getNote: (id: number) => request<Note>(`/notes/${id}`),
+  archivedNotes: (params?: { limit?: number; offset?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.offset) qs.set('offset', String(params.offset));
+    return request<ArchivedNote[]>(`/notes/archived?${qs}`);
+  },
   createNote: (data: { title: string; content: string; tags?: string[]; workspace_id?: number }) =>
     request<Note>('/notes', { method: 'POST', body: JSON.stringify(data) }),
   updateNote: (id: number, data: { title?: string; content?: string; tags?: string[]; ai_summary?: string | null }) =>
@@ -202,12 +208,22 @@ export interface Note {
   created_at: string;
   updated_at: string;
   ai_summary?: string | null;
+  merged_sources?: { id: number; title: string; archived_at: string | null }[];
 }
 
 export interface SearchResult {
   note: Note;
   score: number;
   highlights: string[];
+  is_archived: boolean;
+}
+
+export interface ArchivedNote {
+  id: number;
+  title: string;
+  type: string;
+  archived_at: string | null;
+  updated_at: string | null;
 }
 
 export interface Tag {

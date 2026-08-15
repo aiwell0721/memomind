@@ -461,13 +461,15 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
         note_type: str = Query("note", alias="type", pattern=r"^(note|all)$"),
         _: dict = Depends(verify_token)
     ):
-        """列出笔记（默认仅返回 type='note' 的记录，type=all 返回全部）"""
-        type_filter = "" if note_type == "all" else "WHERE type = 'note'"
+        """列出笔记（默认仅返回 type='note' 的记录，type=all 返回全部；均排除归档）"""
+        type_filter = ("WHERE is_archived = 0"
+                       if note_type == "all"
+                       else "WHERE type = 'note' AND is_archived = 0")
 
         if workspace_id:
-            where_clause = ("WHERE workspace_id = ? AND type = 'note'"
+            where_clause = ("WHERE workspace_id = ? AND type = 'note' AND is_archived = 0"
                             if note_type != "all"
-                            else "WHERE workspace_id = ?")
+                            else "WHERE workspace_id = ? AND is_archived = 0")
             cursor = db.execute(f"""
                 SELECT * FROM notes {where_clause}
                 ORDER BY updated_at DESC LIMIT ? OFFSET ?
@@ -490,6 +492,26 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
             'updated_at': row['updated_at'] + 'Z' if row['updated_at'] else None
         } for row in cursor.fetchall()]
     
+    @app.get("/api/notes/archived", summary="列出归档笔记")
+    def list_archived_notes(
+        limit: int = Query(100, ge=1, le=500),
+        offset: int = Query(0, ge=0),
+        _: dict = Depends(verify_token)
+    ):
+        """列出归档笔记（按归档时间倒序）"""
+        cursor = db.execute("""
+            SELECT id, title, type, archived_at, updated_at
+            FROM notes WHERE is_archived = 1
+            ORDER BY archived_at DESC LIMIT ? OFFSET ?
+        """, (limit, offset))
+        return [{
+            'id': row['id'],
+            'title': row['title'],
+            'type': row['type'] if 'type' in row.keys() else 'note',
+            'archived_at': row['archived_at'] + 'Z' if row['archived_at'] else None,
+            'updated_at': row['updated_at'] + 'Z' if row['updated_at'] else None,
+        } for row in cursor.fetchall()]
+
     @app.get("/api/notes/{note_id}", summary="获取笔记详情")
     def get_note(note_id: int, _: dict = Depends(verify_token)):
         """获取笔记详情（含备注数量、AI 摘要）"""
@@ -509,6 +531,25 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
         """, (note_id,)).fetchone()
         annotation_count = ann_row[0] if ann_row else 0
 
+        # 反查被合并的碎片（supersedes 边）
+        merged_sources = []
+        try:
+            src = db.execute(
+                "SELECT target_note_id FROM note_links "
+                "WHERE source_note_id = ? AND link_type = 'supersedes'",
+                (note_id,)
+            )
+            source_ids = [r['target_note_id'] for r in src.fetchall()]
+            if source_ids:
+                placeholders = ",".join("?" for _ in source_ids)
+                src2 = db.execute(
+                    f"SELECT id, title, archived_at FROM notes WHERE id IN ({placeholders})",
+                    tuple(source_ids)
+                )
+                merged_sources = [dict(r) for r in src2.fetchall()]
+        except Exception:
+            pass  # note_links 表可能不存在
+
         import json
         return {
             'id': row['id'],
@@ -522,6 +563,7 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
             'type': row['type'] if 'type' in row.keys() else 'note',
             'annotation_count': annotation_count,
             'ai_summary': row['ai_summary'] if 'ai_summary' in row.keys() else '',
+            'merged_sources': merged_sources,
         }
     
     @app.post("/api/notes", status_code=status.HTTP_201_CREATED, summary="创建笔记")

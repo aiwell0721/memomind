@@ -188,3 +188,78 @@ class TestDreamingScheduler:
         assert "input_count" in result
         sched.stop()
         db.close()
+
+    def test_should_dreaming_not_enough_notes(self, app):
+        """笔记数不足阈值 → 不触发"""
+        from core.dreaming_scheduler import DreamingScheduler
+        from core.dreaming_service import DreamingService
+        from core.database import Database
+        db = Database(":memory:")
+        dreaming = DreamingService(db)
+        sched = DreamingScheduler(dreaming, min_notes=10, min_days=7)
+        assert sched.should_dreaming() is False
+        db.close()
+
+    def test_should_dreaming_enough_notes(self, app):
+        """笔记数达标且无上次 Dreaming → 触发"""
+        from core.dreaming_scheduler import DreamingScheduler
+        from core.dreaming_service import DreamingService
+        from core.database import Database
+        db = Database(":memory:")
+        dreaming = DreamingService(db)
+        sched = DreamingScheduler(dreaming, min_notes=3, min_days=7)
+        for i in range(3):
+            db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                       (f"笔记{i}", f"内容{i}", None))
+        db.commit()
+        assert sched.should_dreaming() is True
+        db.close()
+
+    def test_should_dreaming_recently_dreamed(self, app):
+        """笔记数达标但最近 Dream 过 → 不触发"""
+        from core.dreaming_scheduler import DreamingScheduler
+        from core.dreaming_service import DreamingService
+        from core.database import Database
+        from datetime import datetime
+        db = Database(":memory:")
+        dreaming = DreamingService(db)
+        sched = DreamingScheduler(dreaming, min_notes=3, min_days=7)
+        for i in range(3):
+            db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                       (f"笔记{i}", f"内容{i}", None))
+        db.execute("INSERT INTO dreaming_sessions (trigger, status, finished_at) "
+                   "VALUES ('manual', 'completed', ?)",
+                   (datetime.now().isoformat(),))
+        db.commit()
+        assert sched.should_dreaming() is False
+        db.close()
+
+
+class TestLayeredArchiving:
+    """分层归档 API 测试"""
+
+    def test_archived_endpoint_and_sources(self, client, headers, setup_notes):
+        """归档端点返回归档笔记 + 列表排除 + 合并笔记反查碎片"""
+        res = client.post("/api/dreaming/run",
+                          json={"strategy": "aggressive", "dry_run": False},
+                          headers=headers)
+        session_id = res.json()["session_id"]
+
+        # 归档端点
+        archived = client.get("/api/notes/archived", headers=headers).json()
+        assert len(archived) > 0
+        for a in archived:
+            assert a["archived_at"] is not None
+
+        # 列表排除归档
+        active = client.get("/api/notes", headers=headers).json()
+        archived_ids = {a["id"] for a in archived}
+        assert not ({n["id"] for n in active} & archived_ids), "活跃列表不应含归档笔记"
+
+        # 碎片反查
+        changes = client.get(f"/api/dreaming/{session_id}/changes", headers=headers).json()
+        merge_changes = [c for c in changes if c["change_type"] == "merge"]
+        if merge_changes:
+            merged_id = merge_changes[0]["target_id"]
+            detail = client.get(f"/api/notes/{merged_id}", headers=headers).json()
+            assert len(detail["merged_sources"]) > 0
