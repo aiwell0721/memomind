@@ -42,7 +42,22 @@ class Database:
         
         # 使用 IF NOT EXISTS 避免重复创建
         pass  # 表会在下面用 CREATE TABLE IF NOT EXISTS 创建
-        
+
+        # 工作区表（notes.workspace_id 的外键目标，必须先于 notes 创建）
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS workspaces (
+                id INTEGER PRIMARY KEY AUTOINCREMENT CHECK(id > 0),
+                name TEXT NOT NULL UNIQUE,
+                description TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        # 默认工作区（先于 notes 外键，保证 workspace_id=1 可引用）
+        cursor.execute("""
+            INSERT OR IGNORE INTO workspaces (id, name, description)
+            VALUES (1, '默认工作区', '系统自动创建的默认工作区')
+        """)
+
         # 创建笔记主表
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS notes (
@@ -50,6 +65,7 @@ class Database:
                 title TEXT NOT NULL,
                 content TEXT NOT NULL,
                 tags TEXT,
+                workspace_id INTEGER REFERENCES workspaces(id) DEFAULT 1,
                 is_archived INTEGER NOT NULL DEFAULT 0,
                 archived_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

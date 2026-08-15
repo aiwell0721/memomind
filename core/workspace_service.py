@@ -43,50 +43,32 @@ class WorkspaceService:
         self._init_schema()
     
     def _init_schema(self):
-        """初始化工作区相关表结构"""
+        """初始化工作区相关表结构（workspaces 表由 database.py 统一创建）"""
         cursor = self.db.conn
-        
-        # 创建工作区表
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS workspaces (
-                id INTEGER PRIMARY KEY AUTOINCREMENT CHECK(id > 0),
-                name TEXT NOT NULL UNIQUE,
-                description TEXT DEFAULT '',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        # 检查 notes 表是否已有 workspace_id 列
+
+        # 检查 notes 表是否已有 workspace_id 列（老库迁移：新库已在 database.py 的 CREATE TABLE 声明）
         info_cursor = self.db.conn.cursor()
         info_cursor.execute("PRAGMA table_info(notes)")
         columns = [col['name'] for col in info_cursor.fetchall()]
-        
+
         if 'workspace_id' not in columns:
-            # SQLite 3.39 以下版本 ALTER TABLE 不支持同时带 REFERENCES 和 DEFAULT，
-            # 这里仅添加列，外键约束在 CREATE TABLE 时已声明。
+            # 老库迁移：SQLite ALTER 不能带 REFERENCES + 非 NULL 默认值，
+            # 故老库加列无外键（新库外键已在 database.py 的 CREATE TABLE 声明）。
             cursor.execute("""
                 ALTER TABLE notes ADD COLUMN workspace_id INTEGER DEFAULT 1
             """)
             # 为已有笔记设置默认工作区
             cursor.execute("""
-                UPDATE notes SET workspace_id = 1 
+                UPDATE notes SET workspace_id = 1
                 WHERE workspace_id IS NULL
             """)
-        
+
         # 创建索引
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_notes_workspace 
+            CREATE INDEX IF NOT EXISTS idx_notes_workspace
             ON notes(workspace_id)
         """)
-        
-        # 确保默认工作区存在
-        row = self.db.execute("SELECT id FROM workspaces WHERE id = 1").fetchone()
-        if not row:
-            self.db.execute("""
-                INSERT INTO workspaces (id, name, description) 
-                VALUES (1, '默认工作区', '系统自动创建的默认工作区')
-            """)
-        
+
         self.db.commit()
     
     def create_workspace(self, name: str, description: str = '') -> int:

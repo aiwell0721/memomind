@@ -13,16 +13,15 @@ cd /d "%~dp0"
 :: 优先级：项目 .venv > PATH 中的 python
 set "PYTHON_EXE="
 if exist "%~dp0.venv\Scripts\python.exe" (
-    "%~dp0.venv\Scripts\python.exe" -c "import fastapi, uvicorn, pydantic_core, sentence_transformers" 2>nul
-    if not errorlevel 1 set "PYTHON_EXE=%~dp0.venv\Scripts\python.exe"
+    set "PYTHON_EXE=%~dp0.venv\Scripts\python.exe"
 )
 if "%PYTHON_EXE%"=="" (
-    python -c "import fastapi, uvicorn, pydantic_core, sentence_transformers" 2>nul
+    where python >nul 2>&1
     if not errorlevel 1 (
         set "PYTHON_EXE=python"
     ) else (
-        echo [错误] 未找到可用的 Python 环境，请先安装依赖:
-        echo   pip install -r requirements.txt
+        echo [错误] 未找到 Python，请先安装:
+        echo   https://www.python.org/downloads/
         pause >nul
         exit /b 1
     )
@@ -34,10 +33,17 @@ echo [1/2] 启动生产服务...
 start "MemoMind-Prod" cmd /k "%PYTHON_EXE% -m uvicorn core.api_server:create_app --factory --host 127.0.0.1 --port 8000"
 
 echo [2/2] 等待服务就绪...
+set /a WAIT_COUNT=0
 :wait_loop
 timeout /t 2 /nobreak >nul
 curl -s http://127.0.0.1:8000/api/health >nul 2>&1
-if %errorlevel% neq 0 goto wait_loop
+if not errorlevel 1 goto ready
+set /a WAIT_COUNT+=1
+if %WAIT_COUNT% lss 30 goto wait_loop
+echo [失败] 服务 60 秒内未就绪，请检查 MemoMind-Prod 窗口输出
+pause >nul
+exit /b 1
+:ready
 
 start http://127.0.0.1:8000
 

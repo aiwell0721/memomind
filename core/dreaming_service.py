@@ -10,10 +10,12 @@ DreamingService — 记忆压缩核心服务
 import json
 import os
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
+
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
 
 from .database import Database
 from .ai_compressor import AiCompressor
@@ -32,15 +34,18 @@ class DreamingService:
 
     def __init__(self, db: Database):
         self.db = db
-        self._model: Optional[SentenceTransformer] = None
+        self._model: Optional["SentenceTransformer"] = None
 
     @property
-    def model(self) -> SentenceTransformer:
+    def model(self) -> "SentenceTransformer":
         if self._model is None:
             self._model = self._load_model()
         return self._model
 
-    def _load_model(self) -> SentenceTransformer:
+    def _load_model(self) -> "SentenceTransformer":
+        # 惰性导入：避免 ARM64 Windows 上 import torch 拖慢启动（约 2 分钟）
+        from sentence_transformers import SentenceTransformer
+
         # 策略 1：离线模式（模型已缓存）
         cache_dir = os.path.expanduser(
             "~/.cache/huggingface/hub/models--shibing624--text2vec-base-chinese")

@@ -12,22 +12,7 @@ from core.semantic_service import SemanticService
 @pytest.fixture
 def db():
     """创建测试数据库"""
-    database = Database(":memory:")
-    # 创建 notes 表（如果不存在）
-    database.execute("""
-        CREATE TABLE IF NOT EXISTS notes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            content TEXT NOT NULL,
-            tags TEXT,
-            workspace_id INTEGER DEFAULT 1,
-            created_by INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    database.commit()
-    return database
+    return Database(":memory:")
 
 
 @pytest.fixture
@@ -367,11 +352,6 @@ class TestScanDuplicates:
 
     def test_scan_with_workspace_filter(self, db):
         """测试工作区过滤"""
-        # 确保 workspace_id 列存在
-        try:
-            db.execute("ALTER TABLE notes ADD COLUMN workspace_id INTEGER DEFAULT 1")
-        except Exception:
-            pass
         # workspace 1
         db.execute("""
             INSERT INTO notes (title, content, tags, workspace_id) VALUES (?, ?, ?, 1)
@@ -380,6 +360,7 @@ class TestScanDuplicates:
             INSERT INTO notes (title, content, tags, workspace_id) VALUES (?, ?, ?, 1)
         """, ("笔记B", "Flask Web 应用开发指南", json.dumps(["python"])))
         # workspace 2（不应被扫描到）
+        db.execute("INSERT INTO workspaces (id, name) VALUES (2, '测试工作区2')")
         db.execute("""
             INSERT INTO notes (title, content, tags, workspace_id) VALUES (?, ?, ?, 2)
         """, ("无关笔记", "完全不同的内容主题", json.dumps(["其他"])))
