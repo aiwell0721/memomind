@@ -65,7 +65,13 @@ export const api = {
   // Links
   outgoingLinks: (noteId: number) => request<Link[]>(`/links/outgoing/${noteId}`),
   incomingLinks: (noteId: number) => request<Link[]>(`/links/incoming/${noteId}`),
-  linkGraph: () => request<Record<string, unknown>[]>('/links/graph'),
+  linkGraph: () => request<LinkGraph>('/links/graph'),
+  graph: (params?: { max_nodes?: number; workspace_id?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.max_nodes) qs.set('max_nodes', String(params.max_nodes));
+    if (params?.workspace_id) qs.set('workspace_id', String(params.workspace_id));
+    return request<GraphData>(`/graph?${qs}`);
+  },
   brokenLinks: () => request<Record<string, unknown>[]>('/links/broken'),
   orphanedNotes: () => request<Record<string, unknown>[]>('/links/orphaned'),
 
@@ -216,6 +222,34 @@ export interface Link {
   source_note_id: number;
   target_note_id: number;
   created_at: string;
+}
+
+export interface LinkGraph {
+  nodes: { id: number; title: string }[];
+  links: { source: number; target: number }[];
+}
+
+export interface GraphNode {
+  id: number;
+  label: string;
+  tags: string[];
+  importance: number;
+  group: string;
+  community: string;
+  is_orphan: boolean;
+  is_delete_candidate: boolean;
+}
+
+export interface GraphEdge {
+  source: number;
+  target: number;
+  type: string;
+  weight: number;
+}
+
+export interface GraphData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
 }
 
 export interface Version {

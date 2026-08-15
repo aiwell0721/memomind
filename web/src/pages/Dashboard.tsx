@@ -13,6 +13,7 @@ const navItems = [
   { path: '/tags', icon: 'tag', label: '标签' },
   { path: '/ai', icon: 'ai', label: 'AI 问答' },
   { path: '/dreaming', icon: 'dreaming', label: '记忆整理' },
+  { path: '/graph', icon: 'graph', label: '知识图谱' },
   { path: '/activity', icon: 'activity', label: '活动日志' },
   { path: '/settings', icon: 'settings', label: '设置' },
 ];
@@ -81,6 +82,16 @@ const icons: Record<string, React.ReactNode> = {
   dreaming: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+    </svg>
+  ),
+  graph: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="5" r="2.5" />
+      <circle cx="5" cy="18" r="2.5" />
+      <circle cx="19" cy="18" r="2.5" />
+      <line x1="12" y1="7.5" x2="5" y2="15.5" />
+      <line x1="12" y1="7.5" x2="19" y2="15.5" />
+      <line x1="7.5" y1="18" x2="16.5" y2="18" />
     </svg>
   ),
 };

@@ -9,6 +9,7 @@ import Activity from './pages/Activity';
 import Settings from './pages/Settings';
 import AiChat from './pages/AiChat';
 import Dreaming from './pages/Dreaming';
+import Graph from './pages/Graph';
 import { api } from './lib/api';
 
 /* ═══════════════════════════════════════════
@@ -67,6 +68,7 @@ function AnimatedRoutes() {
           <Route path="settings" element={<Settings />} />
           <Route path="ai" element={<AiChat />} />
           <Route path="dreaming" element={<Dreaming />} />
+          <Route path="graph" element={<Graph />} />
         </Route>
       </Routes>
     </div>
