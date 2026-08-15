@@ -377,3 +377,40 @@ class TestLintKnowledge:
         note_id = cursor.fetchone()['id']
         delete_ids = [d['note_id'] for d in result['delete']]
         assert note_id in delete_ids
+
+
+class TestGraphWithAnalysis:
+    """get_graph_with_analysis 带分析注解的图谱测试"""
+
+    def test_returns_analysis_fields(self, kg, sample_notes):
+        """返回 nodes + edges，节点带分析字段"""
+        result = kg.get_graph_with_analysis()
+        assert 'nodes' in result
+        assert 'edges' in result
+        for node in result['nodes']:
+            assert 'community' in node
+            assert 'is_orphan' in node
+            assert 'is_delete_candidate' in node
+
+    def test_empty_database(self, kg):
+        """空库返回空 nodes/edges"""
+        result = kg.get_graph_with_analysis()
+        assert result['nodes'] == []
+        assert result['edges'] == []
+
+    def test_orphan_marked(self, kg):
+        """孤立笔记 is_orphan=True"""
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("机器学习基础", "机器学习基础概念", json.dumps(["AI", "机器学习"])))
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("深度学习", "深度学习神经网络", json.dumps(["AI", "深度学习"])))
+        kg.db.execute("INSERT INTO notes (title, content, tags) VALUES (?, ?, ?)",
+                     ("咖啡冲泡", "咖啡豆研磨萃取", json.dumps(["咖啡"])))
+        kg.db.commit()
+
+        result = kg.get_graph_with_analysis()
+        cursor = kg.db.execute("SELECT id FROM notes WHERE title = ?", ("咖啡冲泡",))
+        orphan_id = cursor.fetchone()['id']
+
+        node = next(n for n in result['nodes'] if n['id'] == orphan_id)
+        assert node['is_orphan'] is True

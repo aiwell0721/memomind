@@ -42,6 +42,7 @@ from .backup_service import BackupService
 from .collaboration_service import CollaborationService
 from .ai_provider import create_provider
 from .dreaming_service import DreamingService
+from .knowledge_graph_service import KnowledgeGraphService
 from .dreaming_scheduler import DreamingScheduler
 
 
@@ -368,6 +369,7 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
     versions = VersionService(db)
     tags = TagService(db)
     links = LinkService(db)
+    graph = KnowledgeGraphService(db)
     export = ExportService(db)
     importer = ImportService(db)
     workspaces = WorkspaceService(db)
@@ -659,6 +661,18 @@ def create_app(db_path: str = "~/.memomind/memomind.db") -> FastAPI:
     def get_link_graph(_: dict = Depends(verify_token)):
         """获取链接关系图"""
         return links.get_link_graph()
+
+    @app.get("/api/graph", summary="获取带分析注解的知识图谱")
+    def get_graph(
+        max_nodes: int = Query(100, ge=1, le=500),
+        workspace_id: Optional[int] = Query(None),
+        _: dict = Depends(verify_token),
+    ):
+        """获取知识图谱（节点含社区/孤儿/删除候选注解）"""
+        return graph.get_graph_with_analysis(
+            workspace_id=workspace_id,
+            max_nodes=max_nodes,
+        )
     
     @app.get("/api/links/broken", summary="获取断链")
     def get_broken_links(_: dict = Depends(verify_token)):

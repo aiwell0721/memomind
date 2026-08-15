@@ -75,6 +75,7 @@ docs-project/
 || **09** | **[lint知识健康报告详细设计](./04-detailed-design/09-lint知识健康报告详细设计.md)** | **lint_knowledge 统一知识健康报告（2026-08）** |
 || **10** | **[Query回写半自动详细设计](./04-detailed-design/10-Query回写半自动详细设计.md)** | **RAG 问答回写笔记（CLI 首发 + 云端 provider）** |
 || **11** | **[note_links类型化与supersedes边](./04-detailed-design/11-note_links类型化与supersedes边.md)** | **note_links 加 link_type + Dreaming 记 supersedes 边** |
+|| **12** | **[知识图谱可视化详细设计](./04-detailed-design/12-知识图谱可视化详细设计.md)** | **ECharts 图谱 + 后端分析注解（2026-08）** |
 
 ## 第5类：产品开发计划 (`05-development-plan/`)
 

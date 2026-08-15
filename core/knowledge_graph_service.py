@@ -445,3 +445,58 @@ class KnowledgeGraphService:
             'link': link_candidates,
             'delete': delete_candidates,
         }
+
+    def get_graph_with_analysis(
+        self,
+        workspace_id: Optional[int] = None,
+        max_nodes: int = 100,
+        days_threshold: int = 90,
+        similarity_threshold: float = 0.6,
+    ) -> Dict:
+        """
+        构建带分析注解的知识图谱（可视化用）
+
+        在 build_graph 的基础上，注入：
+        - community: 社区检测结果
+        - is_orphan: 是否孤儿节点
+        - is_delete_candidate: 是否删除候选（孤儿 + 陈旧）
+
+        Args:
+            workspace_id: 工作区过滤
+            max_nodes: 最大节点数
+            days_threshold: 陈旧天数阈值
+            similarity_threshold: Jaccard 相似度阈值
+
+        Returns:
+            {'nodes': [...], 'edges': [...]}
+        """
+        graph = self.build_graph(workspace_id=workspace_id, max_nodes=max_nodes)
+
+        if not graph['nodes']:
+            return {'nodes': [], 'edges': []}
+
+        communities = self.detect_communities(graph)
+
+        lint = self.lint_knowledge(
+            workspace_id=workspace_id,
+            days_threshold=days_threshold,
+            similarity_threshold=similarity_threshold,
+            max_nodes=max_nodes,
+        )
+        orphan_ids = {l['note_id'] for l in lint['link']}
+        delete_ids = {d['note_id'] for d in lint['delete']}
+
+        nodes = []
+        for n in graph['nodes']:
+            nodes.append({
+                'id': n['id'],
+                'label': n['label'],
+                'tags': n.get('tags', []),
+                'importance': n.get('importance', 0),
+                'group': n.get('group', 'other'),
+                'community': communities.get(n['id'], 'other'),
+                'is_orphan': n['id'] in orphan_ids,
+                'is_delete_candidate': n['id'] in delete_ids,
+            })
+
+        return {'nodes': nodes, 'edges': graph['edges']}
