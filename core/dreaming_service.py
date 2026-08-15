@@ -499,6 +499,14 @@ class DreamingService:
 
             # 删除合并产生的笔记
             if target_id:
+                # 清理 merge 时记的 supersedes 边（避免外键约束 + 脏数据）
+                try:
+                    self.db.execute(
+                        "DELETE FROM note_links WHERE source_note_id=? AND link_type='supersedes'",
+                        (target_id,)
+                    )
+                except Exception:
+                    pass  # note_links 表可能不存在
                 self.db.execute("DELETE FROM notes WHERE id=?", (target_id,))
                 self.db.execute("DELETE FROM notes_fts WHERE rowid=?", (target_id,))
                 deleted += 1
