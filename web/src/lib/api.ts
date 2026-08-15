@@ -234,7 +234,6 @@ export interface GraphNode {
   label: string;
   tags: string[];
   importance: number;
-  group: string;
   community: string;
   is_orphan: boolean;
   is_delete_candidate: boolean;

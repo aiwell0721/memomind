@@ -156,7 +156,7 @@ function buildOption(data: GraphData): Record<string, unknown> {
         show: true,
         position: 'right',
         fontSize: 10,
-        color: 'var(--apple-text-secondary)',
+        color: '#8e8e93',
         formatter: (params: any) =>
           params.name.length > 12 ? `${params.name.slice(0, 12)}…` : params.name,
       },

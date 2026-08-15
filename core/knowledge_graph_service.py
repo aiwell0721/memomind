@@ -290,7 +290,8 @@ class KnowledgeGraphService:
         workspace_id: Optional[int] = None,
         days_threshold: int = 90,
         similarity_threshold: float = 0.6,
-        max_nodes: int = 100
+        max_nodes: int = 100,
+        graph: Optional[Dict] = None
     ) -> Dict:
         """
         基于图谱分析给出知识整理建议
@@ -313,8 +314,9 @@ class KnowledgeGraphService:
                 'stale_candidates': [{'note_id': int, 'days_since_update': int, 'title': str}]
             }
         """
-        # 构建图谱
-        graph = self.build_graph(workspace_id=workspace_id, max_nodes=max_nodes)
+        # 构建图谱（可复用已构建的 graph，避免重复计算）
+        if graph is None:
+            graph = self.build_graph(workspace_id=workspace_id, max_nodes=max_nodes)
 
         if not graph['nodes']:
             return {'topics': [], 'merge_suggestions': [], 'stale_candidates': []}
@@ -390,6 +392,7 @@ class KnowledgeGraphService:
         days_threshold: int = 90,
         similarity_threshold: float = 0.6,
         max_nodes: int = 100,
+        graph: Optional[Dict] = None
     ) -> Dict:
         """
         统一知识健康报告
@@ -409,7 +412,9 @@ class KnowledgeGraphService:
         Returns:
             {'merge': [...], 'update': [...], 'link': [...], 'delete': [...]}
         """
-        graph = self.build_graph(workspace_id=workspace_id, max_nodes=max_nodes)
+        # 构建图谱（可复用已构建的 graph，避免重复计算）
+        if graph is None:
+            graph = self.build_graph(workspace_id=workspace_id, max_nodes=max_nodes)
 
         if not graph['nodes']:
             return {'merge': [], 'update': [], 'link': [], 'delete': []}
@@ -427,6 +432,7 @@ class KnowledgeGraphService:
             days_threshold=days_threshold,
             similarity_threshold=similarity_threshold,
             max_nodes=max_nodes,
+            graph=graph,
         )
 
         # delete = 孤儿 ∩ 陈旧
@@ -482,6 +488,7 @@ class KnowledgeGraphService:
             days_threshold=days_threshold,
             similarity_threshold=similarity_threshold,
             max_nodes=max_nodes,
+            graph=graph,
         )
         orphan_ids = {l['note_id'] for l in lint['link']}
         delete_ids = {d['note_id'] for d in lint['delete']}
@@ -493,7 +500,6 @@ class KnowledgeGraphService:
                 'label': n['label'],
                 'tags': n.get('tags', []),
                 'importance': n.get('importance', 0),
-                'group': n.get('group', 'other'),
                 'community': communities.get(n['id'], 'other'),
                 'is_orphan': n['id'] in orphan_ids,
                 'is_delete_candidate': n['id'] in delete_ids,
